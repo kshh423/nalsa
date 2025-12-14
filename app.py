@@ -180,8 +180,8 @@ st.sidebar.header("⚙️ 기본 설정")
 # 3-1. 티커 입력 (기본값 QQQ)
 ticker_symbol = st.sidebar.text_input(
     "**주식 티커를 입력하세요:**",
-    value="QQQ",
-    help="이 탭에 표시되는 티커는 탭 1, 2, 3의 분석 대상이 됩니다."
+    value="NVDA",
+    help="이 탭에 표시되는 티커는 탭 2, 3, 4의 분석 대상이 됩니다."
 ).upper()
 
 # 3-2. 기간 선택 드롭다운
@@ -810,3 +810,4 @@ elif st.session_state.active_tab == "주가 및 이동평균선":
         # 이평선이 아닐 경우 빈 공간을 채워 레이아웃을 유지합니다.
         with col_config_bottom2:
             st.markdown(" ") # 빈 줄
+
