@@ -519,14 +519,21 @@ elif st.session_state.active_tab == "적립 모드 (DCA)":
     dca_df['DayOfYear'] = dca_df.index.dayofyear
     dca_df['WeekOfYear'] = dca_df.index.isocalendar().week.astype(int)
     dca_df['Month'] = dca_df.index.month
-
     if deposit_frequency == "매일":
+        # 매일은 전체 인덱스를 사용
         invest_dates = dca_df.index
     elif deposit_frequency == "매주":
-        invest_dates = dca_df.groupby('WeekOfYear').first().index
+        # 각 WeekOfYear 그룹의 첫 번째 항목 인덱스(날짜)를 사용
+        # .index 대신 .first().index를 사용하면 Series의 인덱스를 가져와서 오류가 발생함.
+        # dca_df.groupby('WeekOfYear')['Price'].first().index는 WeekOfYear이므로,
+        # dca_df.groupby('WeekOfYear')['Price'].idxmin() 또는 idxmax()를 사용해야 하지만,
+        # 가장 간단한 방법은 dca_df의 인덱스를 리스트로 가져오는 것입니다.
+        invest_dates = dca_df.groupby('WeekOfYear')['Price'].head(1).index
     elif deposit_frequency == "매월":
-        invest_dates = dca_df.groupby('Month').first().index
-
+        # 각 Month 그룹의 첫 번째 항목 인덱스(날짜)를 사용
+        # 마찬가지로 dca_df의 인덱스를 리스트로 가져옵니다.
+        invest_dates = dca_df.groupby('Month')['Price'].head(1).index
+        
     dca_result = dca_df[dca_df.index.isin(invest_dates)].copy()
 
     dca_result['Shares_Bought'] = deposit_amount / dca_result['Price']
@@ -810,4 +817,5 @@ elif st.session_state.active_tab == "주가 및 이동평균선":
         # 이평선이 아닐 경우 빈 공간을 채워 레이아웃을 유지합니다.
         with col_config_bottom2:
             st.markdown(" ") # 빈 줄
+
 
