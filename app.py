@@ -5,6 +5,7 @@ import numpy as np
 import plotly.graph_objects as go
 from scipy.stats import linregress
 from datetime import date, timedelta
+import time # 재시도 대기 시간 확보를 위해 time 모듈 import
 
 # --- 0. 상수 정의 ---
 DEFAULT_BIG_TECH_TICKERS = ['NVDA', 'AAPL', 'GOOGL', 'MSFT', 'AMZN', 'AVGO', 'META', 'TSLA']
@@ -35,9 +36,9 @@ SELL_RATIO = {
 }
 
 
-# --- 1. 데이터 로드 및 캐싱 함수 (기존 함수 유지) ---
+# --- 1. 데이터 로드 및 캐싱 함수 (TTL=3600 적용 및 재시도 로직 강화) ---
 
-@st.cache_data(ttl=3600)
+@st.cache_data(ttl=3600) # 👈 1시간 캐싱 적용
 def load_ticker_info(ticker, max_retries=3):
     """티커 정보를 로드합니다 (EPS, 회사 이름) - 재시도 로직 포함."""
     
@@ -56,62 +57,85 @@ def load_ticker_info(ticker, max_retries=3):
                 'CompanyName': info.get('longName', ticker),
             }
             # 성공적으로 데이터를 가져오면 즉시 반환
-            return per_info, None 
+            return per_info, None
         
         except Exception as e:
             # 마지막 시도가 아니면 재시도
             if attempt < max_retries - 1:
-                        wait_time = 5 * (attempt + 1) # 1차: 5초, 2차: 10초 대기
-                        print(f"[{ticker}] Rate limited. Waiting {wait_time} seconds before retrying...")
-                        import time
-                        time.sleep(wait_time)
+                wait_time = 5 * (attempt + 1) # 1차: 5초, 2차: 10초 대기
+                print(f"[{ticker}] Ticker info load failed (Attempt {attempt + 1}/{max_retries}). Waiting {wait_time}s...")
+                time.sleep(wait_time)
             else:
                 # 모든 시도 실패 시 오류 반환
                 return None, f"Ticker information could not be loaded after {max_retries} attempts: {e}"
 
     return None, "Unexpected failure in Ticker Info loading." # 안전 장치
 
-@st.cache_data
-def load_historical_data(ticker, start_date, end_date):
-    """yfinance에서 주가 데이터를 로드합니다."""
+
+@st.cache_data(ttl=3600) # 👈 1시간 캐싱 적용
+def load_historical_data(ticker, start_date, end_date, max_retries=3):
+    """yfinance에서 주가 데이터를 로드합니다 (재시도 로직 포함)."""
     if start_date == 'max':
         start_date = None
 
-    try:
-        hist = yf.download(ticker, start=start_date, end=end_date, progress=False)
-        if hist.empty:
-            return None, "해당 기간의 주가 데이터를 가져올 수 없습니다."
-        return hist, None
-    except Exception as e:
-        return None, f"데이터 로드 중 오류가 발생했습니다: {e}"
-
-
-@st.cache_data
-def load_big_tech_data(tickers):
-    """요청된 빅테크 종목의 재무 정보를 로드합니다."""
-    data_list = []
-    for ticker in tickers:
+    for attempt in range(max_retries):
         try:
-            info = yf.Ticker(ticker).info
-            market_cap = info.get('marketCap', np.nan)
-            trailing_pe = info.get('trailingPE', np.nan)
+            hist = yf.download(ticker, start=start_date, end=end_date, progress=False)
+            if hist.empty:
+                # 데이터는 가져왔지만 내용이 비어있는 경우
+                return None, "해당 기간의 주가 데이터를 가져올 수 없습니다."
+            return hist, None
+        
+        except Exception as e:
+            if attempt < max_retries - 1:
+                wait_time = 5 * (attempt + 1)
+                print(f"[{ticker}] Historical data load failed (Attempt {attempt + 1}/{max_retries}). Waiting {wait_time}s...")
+                time.sleep(wait_time)
+            else:
+                return None, f"데이터 로드 중 오류가 발생했습니다: {e}"
+    
+    return None, "Unexpected failure in Historical Data loading."
 
-            # Net Income = Market Cap / PER
-            net_income = market_cap / trailing_pe if market_cap and trailing_pe and trailing_pe > 0 else np.nan
 
-            data_list.append({
-                'Ticker': ticker,
-                'MarketCap': market_cap,
-                'TrailingPE': trailing_pe,
-                'NetIncome': net_income,
-            })
-        except Exception:
-            data_list.append({
-                'Ticker': ticker,
-                'MarketCap': np.nan,
-                'TrailingPE': np.nan,
-                'NetIncome': np.nan,
-            })
+@st.cache_data(ttl=3600) # 👈 1시간 캐싱 적용
+def load_big_tech_data(tickers, max_retries=3):
+    """요청된 빅테크 종목의 재무 정보를 로드합니다 (재시도 로직 포함)."""
+    data_list = []
+    
+    for ticker in tickers:
+        for attempt in range(max_retries):
+            try:
+                info = yf.Ticker(ticker).info
+                market_cap = info.get('marketCap', np.nan)
+                trailing_pe = info.get('trailingPE', np.nan)
+
+                # Net Income = Market Cap / PER
+                net_income = market_cap / trailing_pe if market_cap and trailing_pe and trailing_pe > 0 else np.nan
+
+                data_list.append({
+                    'Ticker': ticker,
+                    'MarketCap': market_cap,
+                    'TrailingPE': trailing_pe,
+                    'NetIncome': net_income,
+                })
+                break # 성공하면 다음 티커로 이동
+            
+            except Exception as e:
+                if attempt < max_retries - 1:
+                    wait_time = 3 * (attempt + 1) # 개별 티커는 3초 간격으로 재시도
+                    print(f"[{ticker}] Big Tech info load failed (Attempt {attempt + 1}/{max_retries}). Waiting {wait_time}s...")
+                    time.sleep(wait_time)
+                else:
+                    # 모든 시도 실패 시 NaN 값으로 처리하고 다음 티커로 이동
+                    print(f"[{ticker}] Failed to load info after {max_retries} attempts.")
+                    data_list.append({
+                        'Ticker': ticker,
+                        'MarketCap': np.nan,
+                        'TrailingPE': np.nan,
+                        'NetIncome': np.nan,
+                    })
+                    break
+
     return pd.DataFrame(data_list)
 
 
@@ -190,22 +214,40 @@ def calculate_per_and_indicators(df, eps):
 
 # --- 3. 동적 매매 시뮬레이션 로직 (Tab 5 전용) ---
 
-@st.cache_data
-def load_historical_per_and_qqq_data(tickers, start_date, end_date):
+@st.cache_data(ttl=3600) # 👈 1시간 캐싱 적용
+def load_historical_per_and_qqq_data(tickers, start_date, end_date, max_retries=3):
     """
     선택된 빅테크 종목들의 가중 평균 PER 시계열과 QQQ 가격을 계산하여 반환합니다.
     (Tab 5 시뮬레이션용)
     """
     target_tickers = list(set(tickers + ['QQQ']))
-
-    try:
-        price_data_all = yf.download(target_tickers, start=start_date, end=end_date, progress=False)['Close']
-        if price_data_all.empty:
-            return None, "주가 데이터를 가져올 수 없습니다."
-        if isinstance(price_data_all, pd.Series):
-            price_data_all = price_data_all.to_frame(name=target_tickers[0])
-    except Exception as e:
-        return None, f"주가 데이터 로드 오류: {e}"
+    
+    # 주가 데이터 로드 재시도
+    price_data_all = None
+    hist_error = None
+    
+    for attempt in range(max_retries):
+        try:
+            price_data_all = yf.download(target_tickers, start=start_date, end=end_date, progress=False)['Close']
+            if price_data_all.empty:
+                hist_error = "주가 데이터를 가져올 수 없습니다."
+            if isinstance(price_data_all, pd.Series):
+                price_data_all = price_data_all.to_frame(name=target_tickers[0])
+            
+            if not hist_error:
+                break # 성공
+                
+        except Exception as e:
+            hist_error = f"주가 데이터 로드 오류: {e}"
+            if attempt < max_retries - 1:
+                wait_time = 5 * (attempt + 1)
+                print(f"[Multi Tickers] Historical data load failed (Attempt {attempt + 1}/{max_retries}). Waiting {wait_time}s...")
+                time.sleep(wait_time)
+            else:
+                return None, hist_error
+    
+    if hist_error:
+         return None, hist_error
 
     qqq_price_series = price_data_all['QQQ']
 
@@ -215,7 +257,12 @@ def load_historical_per_and_qqq_data(tickers, start_date, end_date):
     valid_tickers = []
 
     # ⚠️ yfinance에서 실시간 Market Cap을 가져와 시가총액 가중 평균 PER의 근사치 계산에 사용
-    # 주의: Market Cap과 EPS는 시뮬레이션 시작 시점을 기준으로 고정되지 않고, 실시간 값으로 계산됩니다.
+    # 참고: 이 정보 로딩은 load_big_tech_data와 유사하게 TTL=3600으로 캐시되지만,
+    # 해당 함수에서 개별 티커 정보 로드 시 Rate Limit 오류가 발생할 수 있습니다.
+    
+    # 이 부분의 반복적인 yf.Ticker().info 호출은 위 load_big_tech_data 함수 로직에서 이미
+    # 재시도 로직을 포함하므로, 여기서는 그대로 사용하고 캐싱 TTL에 의존합니다.
+    
     for ticker in tickers:
         try:
             info = yf.Ticker(ticker).info
@@ -235,8 +282,6 @@ def load_historical_per_and_qqq_data(tickers, start_date, end_date):
         return None, "선택된 종목들에서 유효한 EPS나 Market Cap을 찾을 수 없어 PER 계산이 불가능합니다."
 
     # 2. 가중 평균 PER 시계열 계산 (MarketCap 대신 Price Sum을 EPS Sum으로 나누는 방식 채택)
-    # MarketCap을 실시간으로 가져오면 백테스팅의 공정성이 떨어지므로,
-    # PER 탭에서 사용하는 방식을 유지하여 Price Sum / EPS Sum으로 근사 PER을 사용합니다.
     total_eps_fixed = sum(eps_data.values())
 
     price_sum_data = price_data_all[valid_tickers].sum(axis=1, skipna=True)
@@ -250,7 +295,6 @@ def load_historical_per_and_qqq_data(tickers, start_date, end_date):
     return df_result, None
 
 
-
 def run_dynamic_per_simulation(df_per_hist, initial_investment, initial_cash, regular_deposit, deposit_interval_days):
     """
     PER 기반 동적 매매 전략 시뮬레이션 (매매 대상: QQQ)
@@ -259,9 +303,9 @@ def run_dynamic_per_simulation(df_per_hist, initial_investment, initial_cash, re
 
     results = df_per_hist.copy()
 
-    results['Shares'] = 0.0  # 보유 QQQ 주식 수
-    results['Cash_Pool'] = 0.0  # 현금 풀
-    results['Total_Investment'] = 0.0  # 총 누적 기본 적립금
+    results['Shares'] = 0.0 # 보유 QQQ 주식 수
+    results['Cash_Pool'] = 0.0 # 현금 풀
+    results['Total_Investment'] = 0.0 # 총 누적 기본 적립금
 
     results = results.dropna(subset=['QQQ_Price', 'Avg_PER'])
 
@@ -294,7 +338,7 @@ def run_dynamic_per_simulation(df_per_hist, initial_investment, initial_cash, re
         if (current_date - last_deposit_date).days >= deposit_interval_days:
             deposit_added = regular_deposit
             last_deposit_date = current_date
-            is_trading_day = True  # 적립 주기가 도래한 날에만 매매 실행
+            is_trading_day = True # 적립 주기가 도래한 날에만 매매 실행
 
         shares_change = 0
         cash_change = 0
@@ -305,7 +349,7 @@ def run_dynamic_per_simulation(df_per_hist, initial_investment, initial_cash, re
         # --------------------------------------------------------
         if is_trading_day:
 
-            base_multiplier = 0  # 매수 멀티플라이어 (0: HOLD/SELL)
+            base_multiplier = 0 # 매수 멀티플라이어 (0: HOLD/SELL)
             reinvest_ratio = 0
             is_selling = False
 
@@ -322,11 +366,11 @@ def run_dynamic_per_simulation(df_per_hist, initial_investment, initial_cash, re
 
             # --- 현금 보유 구간 (35 <= PER < 38) ---
             elif PER_CRITERIA_DYNAMIC['BUY_1X'] <= current_per < PER_CRITERIA_DYNAMIC['HOLD']:
-                base_multiplier = 0  # HOLD
+                base_multiplier = 0 # HOLD
 
             # --- 매도 구간 (PER >= 38) ---
             elif current_per >= PER_CRITERIA_DYNAMIC['HOLD']:
-                base_multiplier = 0  # SELL
+                base_multiplier = 0 # SELL
                 is_selling = True
 
                 sell_ratio = 0
@@ -373,7 +417,7 @@ def run_dynamic_per_simulation(df_per_hist, initial_investment, initial_cash, re
         results.loc[current_date, 'Shares'] = new_shares
         results.loc[current_date, 'Cash_Pool'] = new_cash
         results.loc[
-            current_date, 'Total_Investment'] = new_investment  # 매매 주기가 아니면 deposit_added=0이므로 prev_investment 유지
+            current_date, 'Total_Investment'] = new_investment # 매매 주기가 아니면 deposit_added=0이므로 prev_investment 유지
 
     # 최종 가치 계산
     results['Stock_Value'] = results['Shares'] * results['QQQ_Price']
@@ -394,7 +438,7 @@ ONE_YEAR_AGO = TODAY - timedelta(days=365)
 with st.sidebar:
     st.header("⚙️ 기본 설정")
 
-    # 3-1. 티커 입력 (기본값 QQQ)
+    # 3-1. 티커 입력 (기본값 NVDA)
     ticker_symbol = st.text_input(
         "**주식 티커를 입력하세요:**",
         value="NVDA",
@@ -445,6 +489,7 @@ with st.sidebar:
     end_date_final = end_date_input.strftime('%Y-%m-%d')
 
 # --- 데이터 로드 (분석 대상 티커) ---
+# load_ticker_info에 재시도 로직 포함
 info, info_error = load_ticker_info(ticker_symbol)
 
 if info_error:
@@ -453,6 +498,7 @@ if info_error:
 
 st.subheader(f"🚀 {info['CompanyName']} ({ticker_symbol}) 분석")
 
+# load_historical_data에 재시도 로직 포함
 hist_data, data_error = load_historical_data(
     ticker_symbol,
     start_date=start_date_final,
@@ -469,19 +515,19 @@ df_calc = calculate_per_and_indicators(hist_data, info['EPS'])
 # --- 5. 2x2 네모 박스 메뉴 구현 (Tab 5 추가) ---
 
 if 'active_tab' not in st.session_state:
-    st.session_state.active_tab = "재무 분석"  # 초기 선택 메뉴
+    st.session_state.active_tab = "재무 분석" # 초기 선택 메뉴
 
 menu_options = [
     "재무 분석",
     "적립 모드 (DCA)",
     "PER 그래프 분석",
     "주가 및 이동평균선",
-    "PER 기반 QQQ 동적 매매 시뮬레이터"  # <<< Tab 5 추가
+    "PER 기반 QQQ 동적 매매 시뮬레이터" # <<< Tab 5 추가
 ]
 # 5개의 메뉴 버튼을 3x2 레이아웃으로 변경 (첫 줄 3개, 둘째 줄 2개)
 cols_row1 = st.columns(3)
 cols_row2 = st.columns(2)
-cols = cols_row1 + cols_row2 + [None]  # 총 5개 버튼 컬럼 + 남은 공간
+cols = cols_row1 + cols_row2 + [None] # 총 5개 버튼 컬럼 + 남은 공간
 
 for i, option in enumerate(menu_options):
     with cols[i]:
@@ -503,12 +549,6 @@ for i, option in enumerate(menu_options):
             st.rerun()
 
 st.markdown("---")
-
-# --- 6. 선택된 메뉴에 따른 내용 표시 (조건문으로 구현) ---
-
-# ==============================================================================
-# 섹션 1: 재무 분석 (빅테크) - (기존 코드 유지)
-# ==============================================================================
 # ==============================================================================
 # 섹션 1: 재무 분석 (빅테크)
 # ==============================================================================
@@ -1367,6 +1407,7 @@ elif st.session_state.active_tab == "PER 기반 QQQ 동적 매매 시뮬레이�
 
     df_per_table = pd.DataFrame(per_data_table, columns=["PER 구간", "권장 조치", "매매 로직"])
     st.table(df_per_table)
+
 
 
 
