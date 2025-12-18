@@ -37,7 +37,7 @@ SELL_RATIO = {
 
 # --- 1. 데이터 로드 및 캐싱 함수 (기존 함수 유지) ---
 
-@st.cache_data
+@st.cache_data(ttl=3600)
 def load_ticker_info(ticker, max_retries=3):
     """티커 정보를 로드합니다 (EPS, 회사 이름) - 재시도 로직 포함."""
     
@@ -1368,4 +1368,5 @@ elif st.session_state.active_tab == "PER 기반 QQQ 동적 매매 시뮬레이�
 
     df_per_table = pd.DataFrame(per_data_table, columns=["PER 구간", "권장 조치", "매매 로직"])
     st.table(df_per_table)
+
 
