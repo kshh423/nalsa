@@ -61,11 +61,10 @@ def load_ticker_info(ticker, max_retries=3):
         except Exception as e:
             # 마지막 시도가 아니면 재시도
             if attempt < max_retries - 1:
-                # 스트림릿 로그에 재시도 시도를 출력하여 디버깅에 도움
-                print(f"[{ticker}] Ticker info load failed (Attempt {attempt + 1}/{max_retries}): {e}. Retrying...")
-                # 재시도 전에 잠시 대기
-                import time
-                time.sleep(2) 
+                        wait_time = 5 * (attempt + 1) # 1차: 5초, 2차: 10초 대기
+                        print(f"[{ticker}] Rate limited. Waiting {wait_time} seconds before retrying...")
+                        import time
+                        time.sleep(wait_time)
             else:
                 # 모든 시도 실패 시 오류 반환
                 return None, f"Ticker information could not be loaded after {max_retries} attempts: {e}"
@@ -1368,5 +1367,6 @@ elif st.session_state.active_tab == "PER 기반 QQQ 동적 매매 시뮬레이�
 
     df_per_table = pd.DataFrame(per_data_table, columns=["PER 구간", "권장 조치", "매매 로직"])
     st.table(df_per_table)
+
 
 
