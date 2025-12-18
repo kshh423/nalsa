@@ -38,25 +38,39 @@ SELL_RATIO = {
 # --- 1. 데이터 로드 및 캐싱 함수 (기존 함수 유지) ---
 
 @st.cache_data
-def load_ticker_info(ticker):
-    """티커 정보를 로드합니다 (EPS, 회사 이름)."""
-    try:
-        data = yf.Ticker(ticker)
-        info = data.info
+def load_ticker_info(ticker, max_retries=3):
+    """티커 정보를 로드합니다 (EPS, 회사 이름) - 재시도 로직 포함."""
+    
+    for attempt in range(max_retries):
+        try:
+            data = yf.Ticker(ticker)
+            info = data.info
 
-        # EPS (Trailing EPS 선호, 없으면 Forward EPS 시도)
-        eps = info.get('trailingEps')
-        if eps is None or eps == 0:
-            eps = info.get('forwardEps')
+            # EPS (Trailing EPS 선호, 없으면 Forward EPS 시도)
+            eps = info.get('trailingEps')
+            if eps is None or eps == 0:
+                eps = info.get('forwardEps')
 
-        per_info = {
-            'EPS': eps if eps else 0,
-            'CompanyName': info.get('longName', ticker),
-        }
-        return per_info, None
-    except Exception:
-        return None, "Ticker information could not be loaded."
+            per_info = {
+                'EPS': eps if eps else 0,
+                'CompanyName': info.get('longName', ticker),
+            }
+            # 성공적으로 데이터를 가져오면 즉시 반환
+            return per_info, None 
+        
+        except Exception as e:
+            # 마지막 시도가 아니면 재시도
+            if attempt < max_retries - 1:
+                # 스트림릿 로그에 재시도 시도를 출력하여 디버깅에 도움
+                print(f"[{ticker}] Ticker info load failed (Attempt {attempt + 1}/{max_retries}): {e}. Retrying...")
+                # 재시도 전에 잠시 대기
+                import time
+                time.sleep(2) 
+            else:
+                # 모든 시도 실패 시 오류 반환
+                return None, f"Ticker information could not be loaded after {max_retries} attempts: {e}"
 
+    return None, "Unexpected failure in Ticker Info loading." # 안전 장치
 
 @st.cache_data
 def load_historical_data(ticker, start_date, end_date):
@@ -1354,3 +1368,4 @@ elif st.session_state.active_tab == "PER 기반 QQQ 동적 매매 시뮬레이�
 
     df_per_table = pd.DataFrame(per_data_table, columns=["PER 구간", "권장 조치", "매매 로직"])
     st.table(df_per_table)
+
