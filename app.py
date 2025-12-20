@@ -926,7 +926,8 @@ if st.session_state.active_tab == "재무 분석":
         fig_per_tab1.add_trace(go.Scatter(
             x=group_per_series.index, y=group_per_series, 
             mode='lines', name='시총 가중 평균 PER 추이',
-            line=dict(color='#1f77b4', width=2)
+            line=dict(color='#1f77b4', width=2),
+            showlegend=False
         ))
         
         # 역사적 평균 및 중앙값 가로선
@@ -1144,7 +1145,8 @@ elif st.session_state.active_tab == "PER 그래프 분석":
         fig_per.add_trace(go.Scatter(
             x=single_per_series.index, y=single_per_series, 
             mode='lines', name='역사적 PER (TTM)',
-            line=dict(color='#1f77b4')
+            line=dict(color='#1f77b4'),
+            showlegend=False
         ))
         
         # 평균선/중앙값선 추가
@@ -1197,7 +1199,8 @@ elif st.session_state.active_tab == "주가 및 이동평균선":
 
     fig_price.update_layout(
         title=f"{ticker_symbol} 주가 추이", height=500, xaxis_title="날짜", yaxis_title="주가 (Price)",
-        hovermode="x unified", template="plotly_white", legend=dict(yanchor="top", y=0.99, xanchor="left", x=0.01)
+        hovermode="x unified", template="plotly_white", legend=dict(yanchor="top", y=0.99, xanchor="left", x=0.01),
+        showlegend=False
     )
     st.plotly_chart(fig_price, use_container_width=True)
     
@@ -1287,6 +1290,7 @@ elif st.session_state.active_tab == "2 티커 최적 포트폴리오":
                 customdata=df_port[['Return', 'Volatility', 'Sharpe_Ratio']].values * np.array([100, 100, 1]),
                 hovertemplate=('수익률: %{customdata[0]:.2f}%<br>위험: %{customdata[1]:.2f}%<br>' +
                                'Sharpe Ratio: %{customdata[2]:.2f}<extra></extra>'),
+                showlegend=False,
             ))
             
             # 2. 개별 자산
@@ -1300,7 +1304,8 @@ elif st.session_state.active_tab == "2 티커 최적 포트폴리오":
                 # 가중치 정보 제거: 티커 이름, 수익률, 위험만 표시
                 customdata=np.array([[asset_metrics[ticker1_mpt]['Return'] * 100, asset_metrics[ticker1_mpt]['Volatility'] * 100],
                                      [asset_metrics[ticker2_mpt]['Return'] * 100, asset_metrics[ticker2_mpt]['Volatility'] * 100]]),
-                hovertemplate=('자산: %{text}<br>수익률: %{customdata[0]:.2f}%<br>위험: %{customdata[1]:.2f}%<extra></extra>')
+                hovertemplate=('자산: %{text}<br>수익률: %{customdata[0]:.2f}%<br>위험: %{customdata[1]:.2f}%<extra></extra>'),
+                showlegend=False
             ))
             
             # 3. 주요 지점 강조 (MVP, Max Sharpe)
@@ -1322,7 +1327,8 @@ elif st.session_state.active_tab == "2 티커 최적 포트폴리오":
                 title=f"포트폴리오 효율적 투자선 ({ticker1_mpt} vs. {ticker2_mpt})", 
                 xaxis_title="연간 변동성 (위험, %)", yaxis_title="연간 수익률 (%)",
                 template="plotly_white", height=500, hovermode="closest",
-                legend=dict(yanchor="top", y=0.99, xanchor="left", x=0.01)
+                legend=dict(yanchor="top", y=0.99, xanchor="left", x=0.01),
+                showlegend=False
             )
             st.plotly_chart(fig_mpt, use_container_width=True)
             
@@ -1421,10 +1427,22 @@ elif st.session_state.active_tab == "다중 티커 단순 비교":
                 mode='markers+text',
                 text=df_multi_metrics['Ticker'],
                 textposition="bottom center",
-                marker=dict(size=15, opacity=0.8, 
-                            color=df_multi_metrics['Sharpe_Ratio'], 
-                            colorscale='Viridis', showscale=True, 
-                            colorbar=dict(title="Sharpe Ratio")),
+                marker=dict(
+                    size=15, 
+                    opacity=0.8, 
+                    color=df_multi_metrics['Sharpe_Ratio'], 
+                    colorscale='Viridis', 
+                    showscale=True, 
+                    # ⭐ 컬러바를 하단으로 이동시키는 핵심 설정 ⭐
+                    colorbar=dict(
+                        title="Sharpe Ratio",
+                        orientation="h",      # 가로 방향(Horizontal)
+                        yanchor="top",        # 기준점을 위쪽으로
+                        y=-0.2,               # 그래프 x축 아래로 배치
+                        thickness=15,         # 막대 두께 조절
+                        len=0.7               # 막대 길이 (70%)
+                    )
+                ),
                 hovertemplate=(
                     '<b>%{text}</b><br>' +
                     '수익률: %{y:.2f}%<br>' +
@@ -1473,7 +1491,6 @@ elif st.session_state.active_tab == "다중 티커 단순 비교":
             st.info("유효한 데이터를 가진 티커가 없습니다. 티커를 확인해 주세요.")
     else:
         st.info("비교할 티커들을 입력해 주세요.")
-
 
 
 
