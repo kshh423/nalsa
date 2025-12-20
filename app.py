@@ -4,14 +4,17 @@ import pandas as pd
 import numpy as np
 import plotly.graph_objects as go
 from scipy.stats import linregress
-from datetime import date, timedelta
+from datetime import date, timedelta, datetime
 import time
+import pytz
 
 # ==============================================================================
 # 0. 전역 설정 및 상수 정의
 # ==============================================================================
 DEFAULT_BIG_TECH_TICKERS = ['NVDA', 'AAPL', 'GOOGL', 'MSFT', 'AMZN', 'AVGO', 'META', 'TSLA']
-TODAY = date.today()
+KST = pytz.timezone('Asia/Seoul')
+NOW_KST = datetime.now(KST)
+TODAY = NOW_KST.date()
 
 # PER 기준 상수
 PER_CRITERIA_DYNAMIC = {
@@ -645,7 +648,6 @@ with st.sidebar:
     # --- [수정 포인트] 모든 조건에서 days와 start_date_default를 확실히 정의 ---
     if selected_period_name == 'ytd':
         start_date_default = date(TODAY.year, 1, 1)
-        # 오늘부터 올해 1월 1일까지의 일수 계산
         days = (TODAY - start_date_default).days
     elif selected_period_name == 'max':
         # 'max'의 경우 시스템상 아주 먼 과거(예: 20년 전)로 설정하거나 
