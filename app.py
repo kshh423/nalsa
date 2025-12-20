@@ -693,41 +693,44 @@ if data_error:
 # --- C. 핵심 계산 실행 (Tab 2, 3, 4에서 사용) ---
 df_calc = calculate_per_and_indicators(hist_data, info['EPS'])
 
-# --- D. 메뉴 설정 (모바일 2x3 초소형 고정 레이아웃) ---
+# --- D. 메뉴 설정 (모바일 2x3 초소형 버전) ---
 if 'active_tab' not in st.session_state:
     st.session_state.active_tab = "재무 분석" 
 
 menu_options = [
     "재무 분석", "적립 모드 (DCA)", 
     "PER 그래프 분석", "주가 및 이동평균선", 
-    "2 티커 최적 포트폴리오", "다중 티커 단순 비교"
+    "2 티커 최적", "다중 티커 비교" # 글자수가 너무 길면 레이아웃이 깨지므로 소폭 축약
 ]
 
-# CSS: 글자 크기를 더 줄이고 버튼 내부 여백을 제거
+# CSS: 모바일에서 버튼과 간격을 최대한 압축
 st.markdown("""
     <style>
-    /* 컬럼 너비 강제 고정 */
+    /* 1. 컬럼 간격 최소화 및 너비 고정 */
     [data-testid="column"] {
-        width: calc(50% - 0.3rem) !important;
-        flex: 1 1 calc(50% - 0.3rem) !important;
-        min-width: calc(50% - 0.3rem) !important;
+        width: calc(50% - 0.2rem) !important;
+        flex: 1 1 calc(50% - 0.2rem) !important;
+        min-width: calc(50% - 0.2rem) !important;
+        padding: 0 1px !important; /* 컬럼 사이 여백 거의 제거 */
     }
-    /* 버튼 텍스트 초소형화 및 줄바꿈 허용 */
+    
+    /* 2. 버튼 외부 간격(Gap) 제거 */
+    [data-testid="stHorizontalBlock"] {
+        gap: 0.2rem !important;
+    }
+
+    /* 3. 버튼 텍스트 초소형화 */
     .stButton button p {
-        font-size: 0.75rem !important;
-        line-height: 1.1 !important;
-        white-space: normal !important; /* 긴 텍스트는 줄바꿈 허용 */
-        word-break: keep-all !important;
+        font-size: 0.7rem !important; /* 더 작게 조정 */
+        line-height: 1.0 !important;
+        font-weight: 500 !important;
     }
-    /* 버튼 높이 및 패딩 조절 */
+
+    /* 4. 버튼 높이 및 테두리 압축 */
     .stButton button {
-        height: 3.2rem !important;
-        padding: 0px 2px !important;
-        margin-bottom: -10px; /* 줄 간격 축소 */
-    }
-    /* 버튼 내부 레이아웃 중앙 정렬 */
-    div[data-testid="stVerticalBlock"] > div {
-        gap: 0.5rem !important;
+        height: 2.5rem !important; /* 높이 축소 */
+        padding: 0px !important;
+        margin-bottom: -15px !important;
     }
     </style>
     """, unsafe_allow_html=True)
@@ -740,13 +743,11 @@ for i in range(0, len(menu_options), 2):
         with cols[j]:
             is_active = (st.session_state.active_tab == option)
             button_type = "primary" if is_active else "secondary"
-            if st.button(option, key=f"btn_mini_2x3_{i}_{j}", use_container_width=True, type=button_type):
+            if st.button(option, key=f"btn_micro_2x3_{i}_{j}", use_container_width=True, type=button_type):
                 st.session_state.active_tab = option
                 st.rerun()
 
 st.markdown("---")
-
-
 
 
 
@@ -1512,6 +1513,7 @@ elif st.session_state.active_tab == "다중 티커 단순 비교":
             st.info("유효한 데이터를 가진 티커가 없습니다. 티커를 확인해 주세요.")
     else:
         st.info("비교할 티커들을 입력해 주세요.")
+
 
 
 
