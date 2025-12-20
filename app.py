@@ -548,6 +548,26 @@ def calculate_group_metrics(df, selected_tickers):
     
     return total_market_cap, total_net_income, avg_per, avg_per_str, position_text
 
+
+# [전역 함수] 섹션 1과 섹션 3에서 공통으로 호출
+def get_common_per_analysis(tickers, start, end):
+    """
+    그 시점의 실제 실적(Dynamic TTM)을 반영한 PER 시계열을 가져오고
+    통계치(평균, 중앙값)를 계산하여 반환합니다.
+    """
+    # 1. 역사적 PER 시계열 데이터 가져오기 (기존에 정의한 함수 호출)
+    series, error = calculate_accurate_group_per_history(tickers, start, end)
+    
+    if error or series is None or series.empty:
+        return None, None, None, error
+
+    # 2. 이상치 제거 (상위 2% 제거)
+    clean_series = series[series < series.quantile(0.98)]
+    avg_val = clean_series.mean()
+    median_val = clean_series.median()
+    
+    return series, avg_val, median_val, None
+
 # ==============================================================================
 # 3. 유틸리티 및 포매팅 함수
 # ==============================================================================
@@ -622,23 +642,33 @@ with st.sidebar:
     period_options = {"1년": 365, "2년": 730, "5년": 1825, "YTD": 'ytd', "최대 기간": 'max'}
     selected_period_name = st.selectbox("기간 선택:", list(period_options.keys()), index=0)
 
-    # 3. 날짜 입력 필드 정의
-    ONE_YEAR_AGO = TODAY - timedelta(days=365)
+    # --- [수정 포인트] 모든 조건에서 days와 start_date_default를 확실히 정의 ---
     if selected_period_name == 'ytd':
         start_date_default = date(TODAY.year, 1, 1)
+        # 오늘부터 올해 1월 1일까지의 일수 계산
+        days = (TODAY - start_date_default).days
     elif selected_period_name == 'max':
-        start_date_default = ONE_YEAR_AGO # 'max' 선택 시 초기 날짜는 1년 전으로 설정
+        # 'max'의 경우 시스템상 아주 먼 과거(예: 20년 전)로 설정하거나 
+        # yfinance가 인식하는 'max' 문자열을 위해 일수는 넉넉히 설정
+        start_date_default = TODAY - timedelta(days=365*20) 
+        days = 365*20
     else:
+        # 1년, 2년, 5년 선택 시
         days = period_options.get(selected_period_name, 365)
         start_date_default = TODAY - timedelta(days=days)
 
+    # 3. 날짜 입력 필드 (위에서 계산된 default값 사용)
     start_date_input = st.date_input("시작 날짜:", value=start_date_default, max_value=TODAY)
     end_date_input = st.date_input("최종 날짜:", value=TODAY, max_value=TODAY)
 
-    # 최종 기간 결정
-    start_date_final = 'max' if selected_period_name == 'max' else start_date_input.strftime('%Y-%m-%d')
+    # 최종 기간 결정 (문자열 형식으로 통일)
+    # '최대 기간'을 선택했더라도 사용자가 날짜를 직접 수정했다면 그 날짜를 우선시함
+    if selected_period_name == 'max' and start_date_input == start_date_default:
+        start_date_final = 'max'
+    else:
+        start_date_final = start_date_input.strftime('%Y-%m-%d')
+        
     end_date_final = end_date_input.strftime('%Y-%m-%d')
-
 
 # ==============================================================================
 # 5. 핵심 데이터 로드 및 전역 데이터프레임 준비
@@ -1429,6 +1459,7 @@ elif st.session_state.active_tab == "다중 티커 단순 비교":
             st.info("유효한 데이터를 가진 티커가 없습니다. 티커를 확인해 주세요.")
     else:
         st.info("비교할 티커들을 입력해 주세요.")
+
 
 
 
