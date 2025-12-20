@@ -943,13 +943,27 @@ if st.session_state.active_tab == "재무 분석":
             name=f"현재: {current_per_val:.2f}"
         ))
 
+# --- [수정 포인트] 모바일 최적화 및 범례 위치 변경 ---
         fig_per_tab1.update_layout(
-            title="선택 종목 가중 평균 PER 추이 (역사적 실적 반영)",
-            height=450, xaxis_title="날짜", yaxis_title="가중 평균 PER",
-            hovermode="x unified", template="plotly_white"
+            title="빅테크 그룹 가중 평균 PER 히스토리",
+            xaxis_title="날짜", 
+            yaxis_title="PER",
+            hovermode="x unified", 
+            template="plotly_white", 
+            height=500,
+            # 범례 설정: 상단 내부로 이동
+            legend=dict(
+                orientation="h",       # 가로 방향 배치
+                yanchor="bottom",      # y축 기준점을 아래로
+                y=1.02,                # 그래프 바로 위(안쪽 상단은 0.9 정도로 조절 가능)
+                xanchor="right",       # x축 기준점을 오른쪽으로
+                x=1,                   # 오른쪽 끝에 밀착
+                bgcolor="rgba(255, 255, 255, 0.5)" # 배경 반투명 처리
+            ),
+            margin=dict(l=10, r=10, t=50, b=10) # 모바일 여백 최소화
         )
         st.plotly_chart(fig_per_tab1, use_container_width=True)
-
+        
     st.markdown("---")
     # 3. 상단 요약 Metric 표시
     # 그래프보다 위에 배치하여 사용자가 변경사항을 즉시 숫자로 확인하게 합니다.
@@ -1459,6 +1473,7 @@ elif st.session_state.active_tab == "다중 티커 단순 비교":
             st.info("유효한 데이터를 가진 티커가 없습니다. 티커를 확인해 주세요.")
     else:
         st.info("비교할 티커들을 입력해 주세요.")
+
 
 
 
