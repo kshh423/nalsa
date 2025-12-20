@@ -706,10 +706,10 @@ menu_options = [
     "다중 티커 단순 비교",
 ]
 # 3개씩 나누어 두 줄로 배치
-rows = [menu_options[i:i + 3] for i in range(0, len(menu_options), 3)]
+rows = [menu_options[i:i + 2] for i in range(0, len(menu_options), 2)]
 
 for row_idx, row_options in enumerate(rows):
-    cols = st.columns(3)  # 항상 3개의 컬럼 생성
+    cols = st.columns(2)  # 항상 3개의 컬럼 생성
     for col_idx, option in enumerate(row_options):
         with cols[col_idx]:
             is_active = (st.session_state.active_tab == option)
@@ -1494,6 +1494,7 @@ elif st.session_state.active_tab == "다중 티커 단순 비교":
             st.info("유효한 데이터를 가진 티커가 없습니다. 티커를 확인해 주세요.")
     else:
         st.info("비교할 티커들을 입력해 주세요.")
+
 
 
 
