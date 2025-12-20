@@ -693,34 +693,44 @@ if data_error:
 # --- C. 핵심 계산 실행 (Tab 2, 3, 4에서 사용) ---
 df_calc = calculate_per_and_indicators(hist_data, info['EPS'])
 
-# --- D. 메뉴 설정 ---
+# --- D. 메뉴 설정 (모바일 3x2 고정 레이아웃) ---
 if 'active_tab' not in st.session_state:
     st.session_state.active_tab = "재무 분석" 
 
 menu_options = [
-    "재무 분석",
-    "적립 모드 (DCA)",
-    "PER 그래프 분석",
-    "주가 및 이동평균선",
-    "2 티커 최적 포트폴리오",
-    "다중 티커 단순 비교",
+    "재무 분석", "적립 모드 (DCA)", "PER 그래프 분석",
+    "주가 및 이동평균선", "2 티커 최적 포트폴리오", "다중 티커 단순 비교"
 ]
-# 3개씩 나누어 두 줄로 배치
-rows = [menu_options[i:i + 2] for i in range(0, len(menu_options), 2)]
 
-for row_idx, row_options in enumerate(rows):
-    cols = st.columns(2)  # 항상 3개의 컬럼 생성
-    for col_idx, option in enumerate(row_options):
-        with cols[col_idx]:
+# CSS 추가: 모바일에서도 컬럼이 세로로 쌓이지 않게 강제 설정
+st.markdown("""
+    <style>
+    [data-testid="column"] {
+        width: calc(33.3333% - 1rem) !important;
+        flex: 1 1 calc(33.3333% - 1rem) !important;
+        min-width: calc(33.3333% - 1rem) !important;
+    }
+    /* 버튼 텍스트 크기 조절 (모바일 대응) */
+    .stButton button p {
+        font-size: 0.8rem;
+        white-space: nowrap;
+    }
+    </style>
+    """, unsafe_allow_html=True)
+
+# 3개씩 두 줄로 배치
+for i in range(0, len(menu_options), 3):
+    row_options = menu_options[i:i+3]
+    cols = st.columns(3)
+    for j, option in enumerate(row_options):
+        with cols[j]:
             is_active = (st.session_state.active_tab == option)
             button_type = "primary" if is_active else "secondary"
-            # 유니크한 키값을 위해 row와 col 인덱스 활용
-            if st.button(option, key=f"btn_{row_idx}_{col_idx}", use_container_width=True, type=button_type):
+            if st.button(option, key=f"btn_row_{i}_{j}", use_container_width=True, type=button_type):
                 st.session_state.active_tab = option
                 st.rerun()
-                
-st.markdown("---")
 
+st.markdown("---")
 
 
 
@@ -1494,6 +1504,7 @@ elif st.session_state.active_tab == "다중 티커 단순 비교":
             st.info("유효한 데이터를 가진 티커가 없습니다. 티커를 확인해 주세요.")
     else:
         st.info("비교할 티커들을 입력해 주세요.")
+
 
 
 
