@@ -1309,7 +1309,7 @@ elif st.session_state.active_tab == "2 티커 최적":
             asset2_100_pt = df_port.loc[df_port['Weight_2'].idxmax()]
             
             # --- Plotly 그래프 생성 (Efficient Frontier) ---
-            st.markdown("#### 효율적 투자선 (Efficient Frontier) 시각화")
+
             
             fig_mpt = go.Figure()
             
@@ -1523,6 +1523,7 @@ elif st.session_state.active_tab == "다중 티커 비교":
             st.info("유효한 데이터를 가진 티커가 없습니다. 티커를 확인해 주세요.")
     else:
         st.info("비교할 티커들을 입력해 주세요.")
+
 
 
 
