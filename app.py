@@ -693,7 +693,7 @@ if data_error:
 # --- C. 핵심 계산 실행 (Tab 2, 3, 4에서 사용) ---
 df_calc = calculate_per_and_indicators(hist_data, info['EPS'])
 
-# --- D. 메뉴 설정 (모바일 2x3 고정 레이아웃) ---
+# --- D. 메뉴 설정 (모바일 2x3 초소형 고정 레이아웃) ---
 if 'active_tab' not in st.session_state:
     st.session_state.active_tab = "재무 분석" 
 
@@ -703,27 +703,36 @@ menu_options = [
     "2 티커 최적 포트폴리오", "다중 티커 단순 비교"
 ]
 
-# CSS: 모바일에서도 무조건 가로 2개씩 배치
+# CSS: 글자 크기를 더 줄이고 버튼 내부 여백을 제거
 st.markdown("""
     <style>
+    /* 컬럼 너비 강제 고정 */
     [data-testid="column"] {
-        width: calc(50% - 0.5rem) !important;
-        flex: 1 1 calc(50% - 0.5rem) !important;
-        min-width: calc(50% - 0.5rem) !important;
+        width: calc(50% - 0.3rem) !important;
+        flex: 1 1 calc(50% - 0.3rem) !important;
+        min-width: calc(50% - 0.3rem) !important;
     }
-    /* 버튼 텍스트 설정 */
+    /* 버튼 텍스트 초소형화 및 줄바꿈 허용 */
     .stButton button p {
-        font-size: 0.9rem !important;
-        font-weight: bold;
+        font-size: 0.75rem !important;
+        line-height: 1.1 !important;
+        white-space: normal !important; /* 긴 텍스트는 줄바꿈 허용 */
+        word-break: keep-all !important;
     }
-    /* 버튼 높이 균일화 */
+    /* 버튼 높이 및 패딩 조절 */
     .stButton button {
-        height: 3rem;
+        height: 3.2rem !important;
+        padding: 0px 2px !important;
+        margin-bottom: -10px; /* 줄 간격 축소 */
+    }
+    /* 버튼 내부 레이아웃 중앙 정렬 */
+    div[data-testid="stVerticalBlock"] > div {
+        gap: 0.5rem !important;
     }
     </style>
     """, unsafe_allow_html=True)
 
-# 2개씩 3줄로 배치
+# 2개씩 3줄 배치
 for i in range(0, len(menu_options), 2):
     row_options = menu_options[i:i+2]
     cols = st.columns(2)
@@ -731,13 +740,11 @@ for i in range(0, len(menu_options), 2):
         with cols[j]:
             is_active = (st.session_state.active_tab == option)
             button_type = "primary" if is_active else "secondary"
-            if st.button(option, key=f"btn_2x3_{i}_{j}", use_container_width=True, type=button_type):
+            if st.button(option, key=f"btn_mini_2x3_{i}_{j}", use_container_width=True, type=button_type):
                 st.session_state.active_tab = option
                 st.rerun()
 
 st.markdown("---")
-
-
 
 
 
@@ -1505,6 +1512,7 @@ elif st.session_state.active_tab == "다중 티커 단순 비교":
             st.info("유효한 데이터를 가진 티커가 없습니다. 티커를 확인해 주세요.")
     else:
         st.info("비교할 티커들을 입력해 주세요.")
+
 
 
 
