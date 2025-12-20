@@ -1259,7 +1259,7 @@ elif st.session_state.active_tab == "주가 및 이동평균선":
 
 
 
-elif st.session_state.active_tab == "2 티커 최적 포트폴리오":
+elif st.session_state.active_tab == "2 티커 최적":
 
 
     
@@ -1419,7 +1419,7 @@ elif st.session_state.active_tab == "2 티커 최적 포트폴리오":
 # --------------------------------------------------------------------------
 # 섹션 6: 다중 티커 단순 비교 (그래프 상단 배치 및 Zoom Out 기능 재확인)
 # --------------------------------------------------------------------------
-elif st.session_state.active_tab == "다중 티커 단순 비교":
+elif st.session_state.active_tab == "다중 티커 비교":
 
     col_multi_input, col_multi_period = st.columns([2, 1])
 
@@ -1523,6 +1523,7 @@ elif st.session_state.active_tab == "다중 티커 단순 비교":
             st.info("유효한 데이터를 가진 티커가 없습니다. 티커를 확인해 주세요.")
     else:
         st.info("비교할 티커들을 입력해 주세요.")
+
 
 
 
