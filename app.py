@@ -834,6 +834,8 @@ st.markdown("---")
 
 
 
+
+
 # ==============================================================================
 # 6. Tab 구현부
 # ==============================================================================
@@ -841,9 +843,7 @@ st.markdown("---")
 # ------------------------------------------------------------------------------
 # 섹션 1: 재무 분석 (빅테크)
 # ------------------------------------------------------------------------------
-# ==============================================================================
-# 섹션 1: 재무 분석 (빅테크) - 통합 및 오류 수정본
-# ==============================================================================
+
 if st.session_state.active_tab == "재무 분석":
     
     # 1. 초기 데이터 로드 및 세션 상태 관리
@@ -871,22 +871,7 @@ if st.session_state.active_tab == "재무 분석":
         average_per_str = "N/A"
         dynamic_color, position_text_raw = "#gray", "데이터 없음"
 
-    # 3. 상단 요약 Metric 표시
-    # 그래프보다 위에 배치하여 사용자가 변경사항을 즉시 숫자로 확인하게 합니다.
-    col_sum1, col_sum2, col_sum3 = st.columns(3)
-    with col_sum1:
-        st.metric(
-            label="선택 종목 평균 PER (TTM)", 
-            value=average_per_str, 
-            delta=position_text_raw if average_per_str != "N/A" else None, 
-            delta_color='off'
-        )
-    with col_sum2:
-        st.metric(label="총 시가총액 합", value=format_value(total_market_cap))
-    with col_sum3:
-        st.metric(label="총 순이익 합 (역산)", value=format_value(total_net_income))
 
-    st.markdown("---")
 
     # 4. 역사적 PER 추이 그래프 (과거 시점 실적 반영 로직)
     # 전역적으로 정의된 시계열 계산 함수를 호출합니다.
@@ -934,6 +919,22 @@ if st.session_state.active_tab == "재무 분석":
             hovermode="x unified", template="plotly_white"
         )
         st.plotly_chart(fig_per_tab1, use_container_width=True)
+
+    st.markdown("---")
+    # 3. 상단 요약 Metric 표시
+    # 그래프보다 위에 배치하여 사용자가 변경사항을 즉시 숫자로 확인하게 합니다.
+    col_sum1, col_sum2, col_sum3 = st.columns(3)
+    with col_sum1:
+        st.metric(
+            label="선택 종목 평균 PER (TTM)", 
+            value=average_per_str, 
+            delta=position_text_raw if average_per_str != "N/A" else None, 
+            delta_color='off'
+        )
+    with col_sum2:
+        st.metric(label="총 시가총액 합", value=format_value(total_market_cap))
+    with col_sum3:
+        st.metric(label="총 순이익 합 (역산)", value=format_value(total_net_income))
 
     st.markdown("---")
     
