@@ -1464,3 +1464,4 @@ elif st.session_state.active_tab == "다중 티커 단순 비교":
 
 
 
+
