@@ -705,18 +705,21 @@ menu_options = [
     "2 티커 최적 포트폴리오",
     "다중 티커 단순 비교",
 ]
-cols = st.columns(len(menu_options))
+# 3개씩 나누어 두 줄로 배치
+rows = [menu_options[i:i + 3] for i in range(0, len(menu_options), 3)]
 
-for i, option in enumerate(menu_options):
-    with cols[i]:
-        is_active = (st.session_state.active_tab == option)
-        button_type = "primary" if is_active else "secondary"
-        if st.button(option, key=f"tab_button_{i}", use_container_width=True, type=button_type):
-            st.session_state.active_tab = option
-            st.rerun()
-
+for row_idx, row_options in enumerate(rows):
+    cols = st.columns(3)  # 항상 3개의 컬럼 생성
+    for col_idx, option in enumerate(row_options):
+        with cols[col_idx]:
+            is_active = (st.session_state.active_tab == option)
+            button_type = "primary" if is_active else "secondary"
+            # 유니크한 키값을 위해 row와 col 인덱스 활용
+            if st.button(option, key=f"btn_{row_idx}_{col_idx}", use_container_width=True, type=button_type):
+                st.session_state.active_tab = option
+                st.rerun()
+                
 st.markdown("---")
-
 
 
 
@@ -1491,6 +1494,7 @@ elif st.session_state.active_tab == "다중 티커 단순 비교":
             st.info("유효한 데이터를 가진 티커가 없습니다. 티커를 확인해 주세요.")
     else:
         st.info("비교할 티커들을 입력해 주세요.")
+
 
 
 
