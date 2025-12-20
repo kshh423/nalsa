@@ -36,6 +36,7 @@ PER_LINE_STYLES = {
 PER_LEVELS_SORTED = sorted(list(set(PER_CRITERIA_DYNAMIC.values())))
 
 
+
 # ==============================================================================
 # 1. 데이터 로드 및 캐싱 함수
 # ==============================================================================
@@ -1309,7 +1310,7 @@ elif st.session_state.active_tab == "2 티커 최적":
             asset2_100_pt = df_port.loc[df_port['Weight_2'].idxmax()]
             
             # --- Plotly 그래프 생성 (Efficient Frontier) ---
-
+            st.markdown("#### 효율적 투자선 (Efficient Frontier) 시각화")
             
             fig_mpt = go.Figure()
             
@@ -1364,54 +1365,61 @@ elif st.session_state.active_tab == "2 티커 최적":
             )
             st.plotly_chart(fig_mpt, use_container_width=True)
             
-            # --- 결과 요약 ---
-            st.markdown("### 🎯 주요 포트폴리오 분석 결과")
-            
-            # 1. 개별 자산 메트릭
-            st.markdown("#### 개별 자산 분석")
-            col_asset_1_r, col_asset_1_v, col_asset_2_r, col_asset_2_v = st.columns(4)
-            
-            col_asset_1_r.metric(f"📈 {ticker1_mpt} 수익률", f"{asset_metrics[ticker1_mpt]['Return'] * 100:.2f}%")
-            col_asset_1_v.metric(f"위험", f"{asset_metrics[ticker1_mpt]['Volatility'] * 100:.2f}%")
-            
-            col_asset_2_r.metric(f"📈 {ticker2_mpt} 수익률", f"{asset_metrics[ticker2_mpt]['Return'] * 100:.2f}%")
-            col_asset_2_v.metric(f"위험", f"{asset_metrics[ticker2_mpt]['Volatility'] * 100:.2f}%")
-            
-            st.markdown("---")
-            
-            # 2. MVP와 Max Sharpe 출력 (가중치 제거)
-            col_mvp, col_sharpe = st.columns(2)
-            
-            with col_mvp:
-                st.subheader("🛡️ 최소 분산 (MVP)")
-                st.metric(f"수익률", f"{mvp['Return'] * 100:.2f}%")
-                st.metric(f"변동성 (위험)", f"{mvp['Volatility'] * 100:.2f}%")
-                st.metric(f"Sharpe Ratio", f"{mvp['Sharpe_Ratio']:.2f}", help="무위험 이자율 0 가정 시")
+            # --- 데이터 통합 표 생성 ---
 
-            with col_sharpe:
-                st.subheader("🌟 최대 샤프 비율")
-                st.metric(f"Sharpe Ratio", f"{max_sharpe['Sharpe_Ratio']:.2f}")
-                st.metric(f"수익률", f"{max_sharpe['Return'] * 100:.2f}%")
-                st.metric(f"변동성 (위험)", f"{max_sharpe['Volatility'] * 100:.2f}%")
-                
-            st.markdown("---")
-            
-            # 3. 개념 설명 및 다이어그램
-            st.subheader("💡 효율적 투자선 (Efficient Frontier)의 개념")
+            # 1. 제목 및 도움말 (Popover 활용으로 SyntaxError 방지)
             st.markdown(
-                """
-                **효율적 투자선**은 **주어진 위험(변동성)에서 최대의 기대 수익률을 제공**하거나, **주어진 기대 수익률에서 최소의 위험을 제공**하는 포트폴리오들의 집합입니다. 
-                * **최소 분산 포트폴리오 (MVP):** 포트폴리오가 달성할 수 있는 가장 낮은 위험(변동성)을 가진 지점입니다.
-                * **최대 샤프 비율 포트폴리오:** 위험 한 단위당 가장 높은 초과 수익(샤프 비율)을 제공하는 지점입니다. 이는 자본 시장선(CML)과 효율적 투자선이 접하는 지점입니다.
+                "#### 📊 자산 및 포트폴리오 통합 비교", 
+                help="""
+💡 효율적 투자선 (Efficient Frontier) 이란?
+
+주어진 위험에서 최대 수익을 내거나, 목표 수익에서 위험을 최소화하는 최적의 포트폴리오 집합입니다.
+                
+🔵최고안전: 역사적으로 변동성(위험)이 가장 낮았던 지점입니다.
+
+🟢최적비율: 위험 대비 보상이 가장 커서 자산 배분 시 가장 권장되는 지점입니다.
+기준금리 3%로 반영함.
                 """
             )
 
-            st.info(f"⚠️ **참고:** 분석 기간: {start_date_mpt} ~ {end_date_mpt}. 모든 수익률 및 변동성은 연환산 기준이며, 무위험 이자율은 0으로 가정합니다.")
+            # 2. 개별 자산의 Sharpe Ratio 직접 계산
+            def calc_sharpe(ret, vol):
+                rf=0.03
+                return (ret - rf) / vol if vol != 0 else 0
 
-        else:
-            st.warning("유효한 데이터를 찾지 못했거나 오류가 발생했습니다. 티커와 기간을 확인해 주세요.")
-    else:
-        st.info("공백으로 구분된 서로 다른 두 개의 유효한 주식 티커를 입력하고 분석 기간을 선택해 주세요.")
+            asset1_sharpe = calc_sharpe(asset_metrics[ticker1_mpt]['Return'], asset_metrics[ticker1_mpt]['Volatility'])
+            asset2_sharpe = calc_sharpe(asset_metrics[ticker2_mpt]['Return'], asset_metrics[ticker2_mpt]['Volatility'])
+
+            mvp_sharpe_3pct = calc_sharpe(mvp['Return'], mvp['Volatility'])
+            max_sharpe_3pct = calc_sharpe(max_sharpe['Return'], max_sharpe['Volatility'])
+
+
+            # 3. 데이터 프레임 구축 및 출력
+            comparison_df = pd.DataFrame({
+                "항목": ["연간 수익률", "연간 변동성(위험)", "Sharpe Ratio"],
+                f"{ticker1_mpt}": [
+                    f"{asset_metrics[ticker1_mpt]['Return'] * 100:.2f}%",
+                    f"{asset_metrics[ticker1_mpt]['Volatility'] * 100:.2f}%",
+                    f"{asset1_sharpe:.2f}"
+                ],
+                f"{ticker2_mpt}": [
+                    f"{asset_metrics[ticker2_mpt]['Return'] * 100:.2f}%",
+                    f"{asset_metrics[ticker2_mpt]['Volatility'] * 100:.2f}%",
+                    f"{asset2_sharpe:.2f}"
+                ],
+                "🔵 최고안전": [
+                    f"{mvp['Return'] * 100:.2f}%",
+                    f"{mvp['Volatility'] * 100:.2f}%",
+                    f"{mvp_sharpe_3pct:.2f}"
+                ],
+                "🟢 최적비율": [
+                    f"{max_sharpe['Return'] * 100:.2f}%",
+                    f"{max_sharpe['Volatility'] * 100:.2f}%",
+                    f"{max_sharpe_3pct:.2f}"
+                ]
+            })
+            comparison_df.set_index("항목", inplace=True)
+            st.table(comparison_df)
 
 
 
@@ -1523,8 +1531,6 @@ elif st.session_state.active_tab == "다중 티커 비교":
             st.info("유효한 데이터를 가진 티커가 없습니다. 티커를 확인해 주세요.")
     else:
         st.info("비교할 티커들을 입력해 주세요.")
-
-
 
 
 
