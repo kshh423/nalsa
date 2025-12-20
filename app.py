@@ -985,7 +985,7 @@ if st.session_state.active_tab == "재무 분석":
             yaxis_title="PER",
             hovermode="x unified", 
             template="plotly_white", 
-            height=700,
+            height=500,
             # 범례 설정: 상단 내부로 이동
             legend=dict(
                 orientation="h",       # 가로 방향 배치
@@ -1124,7 +1124,7 @@ elif st.session_state.active_tab == "적립 모드 (DCA)":
                                  line=dict(color='red', width=2, dash='dash'), yaxis='y1'))
 
     fig_dca.update_layout(
-        title=f"{ticker_symbol} 적립식 투자(DCA) 시뮬레이션", height=700, xaxis_title="날짜", hovermode="x unified",
+        title=f"{ticker_symbol} 적립식 투자(DCA) 시뮬레이션", height=500, xaxis_title="날짜", hovermode="x unified",
         legend=dict(x=0.01, y=0.99, yanchor="top", xanchor="left"),
         yaxis=dict(title=dict(text="투자 금액/가치 (USD)", font=dict(color="green")), side="left", showgrid=True),
         yaxis2=dict(title=dict(text="주가 (Price, 배경)", font=dict(color="gray")), overlaying="y", side="right", showgrid=False, range=[full_dca_results['Price'].min() * 0.9, full_dca_results['Price'].max() * 1.1])
@@ -1232,7 +1232,7 @@ elif st.session_state.active_tab == "주가 및 이동평균선":
     fig_price.add_trace(go.Scatter(x=df_calc.index, y=df_calc[overlay_column_price], mode='lines', name=overlay_name_price, line=dict(color='red', dash='dash', width=2)))
 
     fig_price.update_layout(
-        title=f"{ticker_symbol} 주가 추이", height=700, xaxis_title="날짜", yaxis_title="주가 (Price)",
+        title=f"{ticker_symbol} 주가 추이", height=500, xaxis_title="날짜", yaxis_title="주가 (Price)",
         hovermode="x unified", template="plotly_white", legend=dict(yanchor="top", y=0.99, xanchor="left", x=0.01),
         showlegend=False
     )
@@ -1306,7 +1306,7 @@ elif st.session_state.active_tab == "2 티커 최적":
                                             marker=dict(size=15, color=color, symbol='circle', line=dict(width=1, color='white')),
                                             hovertemplate=f'<b>{name}</b><br>수익률: %{{y:.2f}}%<br>위험: %{{x:.2f}}%<extra></extra>'))
 
-            fig_mpt.update_layout(xaxis_title="연간 위험률 (%)", yaxis_title="연간 수익률 (%)", template="plotly_white", height=700, legend=dict(yanchor="top", y=0.99, xanchor="left", x=0.01))
+            fig_mpt.update_layout(xaxis_title="연간 위험률 (%)", yaxis_title="연간 수익률 (%)", template="plotly_white", height=600, legend=dict(yanchor="top", y=0.99, xanchor="left", x=0.01))
             st.plotly_chart(fig_mpt, use_container_width=True)
 
             # 2. 결과표
@@ -1363,7 +1363,7 @@ elif st.session_state.active_tab == "다중 티커 비교":
             fig_multi = go.Figure(go.Scatter(x=df_m['Volatility']*100, y=df_m['Return']*100, mode='markers+text', text=df_m['Ticker'], textposition="bottom center",
                                             marker=dict(size=15, color=df_m['Sharpe_Ratio'], colorscale='Viridis', showscale=True, 
                                                         colorbar=dict(title="Sharpe", orientation="h", y=-0.25, thickness=15, outlinewidth=0))))
-            fig_multi.update_layout(xaxis_title="위험률 (%)", yaxis_title="수익률 (%)", template="plotly_white", height=700, margin=dict(b=100), xaxis=dict(rangemode='tozero'), yaxis=dict(rangemode='tozero'))
+            fig_multi.update_layout(xaxis_title="위험률 (%)", yaxis_title="수익률 (%)", template="plotly_white", height=600, margin=dict(b=100), xaxis=dict(rangemode='tozero'), yaxis=dict(rangemode='tozero'))
             st.plotly_chart(fig_multi, use_container_width=True)
 
             df_d = df_m.sort_values(by='Sharpe_Ratio', ascending=False).reset_index(drop=True)
