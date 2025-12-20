@@ -673,6 +673,7 @@ with st.sidebar:
         
     end_date_final = end_date_input.strftime('%Y-%m-%d')
 
+
 # ==============================================================================
 # 5. 핵심 데이터 로드 및 전역 데이터프레임 준비
 # ==============================================================================
@@ -984,7 +985,7 @@ if st.session_state.active_tab == "재무 분석":
             yaxis_title="PER",
             hovermode="x unified", 
             template="plotly_white", 
-            height=500,
+            height=700,
             # 범례 설정: 상단 내부로 이동
             legend=dict(
                 orientation="h",       # 가로 방향 배치
@@ -1123,7 +1124,7 @@ elif st.session_state.active_tab == "적립 모드 (DCA)":
                                  line=dict(color='red', width=2, dash='dash'), yaxis='y1'))
 
     fig_dca.update_layout(
-        title=f"{ticker_symbol} 적립식 투자(DCA) 시뮬레이션", height=500, xaxis_title="날짜", hovermode="x unified",
+        title=f"{ticker_symbol} 적립식 투자(DCA) 시뮬레이션", height=700, xaxis_title="날짜", hovermode="x unified",
         legend=dict(x=0.01, y=0.99, yanchor="top", xanchor="left"),
         yaxis=dict(title=dict(text="투자 금액/가치 (USD)", font=dict(color="green")), side="left", showgrid=True),
         yaxis2=dict(title=dict(text="주가 (Price, 배경)", font=dict(color="gray")), overlaying="y", side="right", showgrid=False, range=[full_dca_results['Price'].min() * 0.9, full_dca_results['Price'].max() * 1.1])
@@ -1231,7 +1232,7 @@ elif st.session_state.active_tab == "주가 및 이동평균선":
     fig_price.add_trace(go.Scatter(x=df_calc.index, y=df_calc[overlay_column_price], mode='lines', name=overlay_name_price, line=dict(color='red', dash='dash', width=2)))
 
     fig_price.update_layout(
-        title=f"{ticker_symbol} 주가 추이", height=500, xaxis_title="날짜", yaxis_title="주가 (Price)",
+        title=f"{ticker_symbol} 주가 추이", height=700, xaxis_title="날짜", yaxis_title="주가 (Price)",
         hovermode="x unified", template="plotly_white", legend=dict(yanchor="top", y=0.99, xanchor="left", x=0.01),
         showlegend=False
     )
@@ -1253,21 +1254,14 @@ elif st.session_state.active_tab == "주가 및 이동평균선":
     else:
         with col_config_bottom2:
             st.markdown(" ")
-######################################################################################
 
 
 
-
-
-
+# --------------------------------------------------------------------------
+# 섹션 5: 2 티커 최적 포트폴리오
+# --------------------------------------------------------------------------
 elif st.session_state.active_tab == "2 티커 최적":
-
-
-    
-    # ------------------------------------
-    # 1. 입력 섹션 (생략)
-    # ------------------------------------
-    col_input_tickers, col_input_period = st.columns([2, 1])
+    col_input_tickers, col_input_period, col_input_rf = st.columns([2, 1, 1])
 
     with col_input_tickers:
         ticker_input_str = st.text_input("비교할 티커 입력 (쉼표나 공백으로 구분)", value="SCHD QQQ", key="tickers_mpt_single_sec5")
@@ -1275,7 +1269,11 @@ elif st.session_state.active_tab == "2 티커 최적":
     with col_input_period:
         period_options_mpt = {"1년": 365, "3년": 3 * 365, "5년": 5 * 365}
         selected_period_name = st.selectbox("분석 기간:", list(period_options_mpt.keys()), index=1, key="period_mpt_sec5")
-        
+
+    with col_input_rf:
+        user_rf = st.number_input("기준금리(%)", value=3.0, step=0.1, key="rf_sec5")
+        rf_multi = user_rf / 100
+    
     ticker_list = [t.strip().upper() for t in ticker_input_str.split() if t.strip()]
     if len(ticker_list) >= 2:
         ticker1_mpt, ticker2_mpt = ticker_list[0], ticker_list[1]
@@ -1286,246 +1284,97 @@ elif st.session_state.active_tab == "2 티커 최적":
     start_date_mpt = (TODAY - timedelta(days=days_mpt)).strftime('%Y-%m-%d')
     end_date_mpt = TODAY.strftime('%Y-%m-%d')
 
-
-    # ------------------------------------
-    # 2. 분석 로직 (가중치 관련 로직 제거)
-    # ------------------------------------
     if ticker1_mpt and ticker2_mpt and ticker1_mpt != ticker2_mpt:
-        
-        with st.spinner(f"**{ticker1_mpt}**와 **{ticker2_mpt}**의 포트폴리오 분석 중..."):
-            # calculate_portfolio_metrics 함수는 내부적으로 여전히 가중치를 계산하지만,
-            # 여기서는 반환되는 df_port와 key_points에서 가중치 정보를 사용하지 않습니다.
+        with st.spinner(f"**{ticker1_mpt}**와 **{ticker2_mpt}** 분석 중..."):
             df_port, port_error, key_points = calculate_portfolio_metrics(ticker1_mpt, ticker2_mpt, start_date_mpt, end_date_mpt)
             
         if port_error:
-            st.error(f"포트폴리오 데이터 로드 오류: {port_error}")
+            st.error(f"오류: {port_error}")
         elif df_port is not None and not df_port.empty:
-            
             mvp = key_points['mvp']
             max_sharpe = key_points['max_sharpe']
             asset_metrics = key_points['asset_metrics']
-            
-            # 개별 자산의 100% 포트폴리오 지점 데이터
-            asset1_100_pt = df_port.loc[df_port['Weight_1'].idxmax()]
-            asset2_100_pt = df_port.loc[df_port['Weight_2'].idxmax()]
-            
-            # --- Plotly 그래프 생성 (Efficient Frontier) ---
-            st.markdown("#### 효율적 투자선 (Efficient Frontier) 시각화")
-            
+
+            # 1. 그래프
+            st.markdown("#### 📈 효율적 투자선 시각화", help="곡선은 두 자산의 배분 비율 조합입니다. 원형(●) 마커는 통계적 최적 지점입니다.")
             fig_mpt = go.Figure()
+            fig_mpt.add_trace(go.Scatter(x=df_port['Volatility'] * 100, y=df_port['Return'] * 100, mode='lines', line=dict(color='gray', width=1), showlegend=False))
             
-            # 1. 시뮬레이션된 포트폴리오 (라인)
-            fig_mpt.add_trace(go.Scatter(
-                x=df_port['Volatility'] * 100, y=df_port['Return'] * 100,
-                mode='lines', marker=dict(size=4, color='lightgray'),
-                name='포트폴리오 배합', line=dict(color='gray', width=1),
-                # 가중치 정보 제거: 수익률, 위험, 샤프 비율만 표시
-                customdata=df_port[['Return', 'Volatility', 'Sharpe_Ratio']].values * np.array([100, 100, 1]),
-                hovertemplate=('수익률: %{customdata[0]:.2f}%<br>위험: %{customdata[1]:.2f}%<br>' +
-                               'Sharpe Ratio: %{customdata[2]:.2f}<extra></extra>'),
-                showlegend=False,
-            ))
-            
-            # 2. 개별 자산
-            fig_mpt.add_trace(go.Scatter(
-                x=[asset_metrics[ticker1_mpt]['Volatility'] * 100, asset_metrics[ticker2_mpt]['Volatility'] * 100],
-                y=[asset_metrics[ticker1_mpt]['Return'] * 100, asset_metrics[ticker2_mpt]['Return'] * 100],
-                mode='markers+text', name='개별 자산',
-                marker=dict(size=12, color='darkorange'),
-                text=[ticker1_mpt, ticker2_mpt], textposition="bottom right",
-                
-                # 가중치 정보 제거: 티커 이름, 수익률, 위험만 표시
-                customdata=np.array([[asset_metrics[ticker1_mpt]['Return'] * 100, asset_metrics[ticker1_mpt]['Volatility'] * 100],
-                                     [asset_metrics[ticker2_mpt]['Return'] * 100, asset_metrics[ticker2_mpt]['Volatility'] * 100]]),
-                hovertemplate=('자산: %{text}<br>수익률: %{customdata[0]:.2f}%<br>위험: %{customdata[1]:.2f}%<extra></extra>'),
-                showlegend=False
-            ))
-            
-            # 3. 주요 지점 강조 (MVP, Max Sharpe)
-            key_points_data = [(mvp, '최소 분산 (MVP)', 'blue'), (max_sharpe, '최대 샤프 비율', 'green')]
-            for point, name, color in key_points_data:
-                
-                point_return, point_volatility = point['Return'] * 100, point['Volatility'] * 100
-                point_sharpe = point['Sharpe_Ratio']
-                    
-                fig_mpt.add_trace(go.Scatter(
-                    x=[point_volatility], y=[point_return], mode='markers', name=name,
-                    marker=dict(size=15, color=color, symbol='star'),
-                    hovertemplate=(
-                        f'<b>{name}</b><br>수익률: {point_return:.2f}%<br>위험: {point_volatility:.2f}%<br>' +
-                        f'Sharpe Ratio: {point_sharpe:.2f}<extra></extra>') # 가중치 제거
-                ))
+            key_pts = [(mvp, '🔵 최고안전', 'blue'), (max_sharpe, '🟢 최적비율', 'green')]
+            for pt, name, color in key_pts:
+                fig_mpt.add_trace(go.Scatter(x=[pt['Volatility'] * 100], y=[pt['Return'] * 100], mode='markers', name=name,
+                                            marker=dict(size=15, color=color, symbol='circle', line=dict(width=1, color='white')),
+                                            hovertemplate=f'<b>{name}</b><br>수익률: %{{y:.2f}}%<br>위험: %{{x:.2f}}%<extra></extra>'))
 
-            fig_mpt.update_layout(
-                title=f"포트폴리오 효율적 투자선 ({ticker1_mpt} vs. {ticker2_mpt})", 
-                xaxis_title="연간 변동성 (위험, %)", yaxis_title="연간 수익률 (%)",
-                template="plotly_white", height=500, hovermode="closest",
-                legend=dict(yanchor="top", y=0.99, xanchor="left", x=0.01),
-                showlegend=False
-            )
+            fig_mpt.update_layout(xaxis_title="연간 위험률 (%)", yaxis_title="연간 수익률 (%)", template="plotly_white", height=700, legend=dict(yanchor="top", y=0.99, xanchor="left", x=0.01))
             st.plotly_chart(fig_mpt, use_container_width=True)
+
+            # 2. 결과표
+            st.markdown("#### 📊 자산 및 포트폴리오 통합 비교", help=f"기준금리 {user_rf}%를 반영하여 계산되었습니다.")
+            def calc_s(r, v): return (r - rf_multi) / v if v != 0 else 0
             
-            # --- 데이터 통합 표 생성 ---
+            rows = [
+                {"대상": ticker1_mpt, "수익률": asset_metrics[ticker1_mpt]['Return'], "위험률": asset_metrics[ticker1_mpt]['Volatility']},
+                {"대상": ticker2_mpt, "수익률": asset_metrics[ticker2_mpt]['Return'], "위험률": asset_metrics[ticker2_mpt]['Volatility']},
+                {"대상": "🔵 최고안전", "수익률": mvp['Return'], "위험률": mvp['Volatility']},
+                {"대상": "🟢 최적비율", "수익률": max_sharpe['Return'], "위험률": max_sharpe['Volatility']}
+            ]
+            df_res = pd.DataFrame(rows)
+            df_res['Sharpe Ratio'] = df_res.apply(lambda x: calc_s(x['수익률'], x['위험률']), axis=1)
+            df_res = df_res.sort_values(by='Sharpe Ratio', ascending=False).reset_index(drop=True)
+            df_res.index += 1
+            
+            df_f = df_res.copy()
+            df_f['수익률'] = df_f['수익률'].apply(lambda x: f"{x * 100:.2f}%")
+            df_f['위험률'] = df_f['위험률'].apply(lambda x: f"{x * 100:.2f}%")
+            df_f['Sharpe Ratio'] = df_f['Sharpe Ratio'].apply(lambda x: f"{x:.2f}")
+            st.dataframe(df_f, use_container_width=True)
 
-            # 1. 제목 및 도움말 (Popover 활용으로 SyntaxError 방지)
-            st.markdown(
-                "#### 📊 자산 및 포트폴리오 통합 비교", 
-                help="""
-💡 효율적 투자선 (Efficient Frontier) 이란?
-
-주어진 위험에서 최대 수익을 내거나, 목표 수익에서 위험을 최소화하는 최적의 포트폴리오 집합입니다.
-                
-🔵최고안전: 역사적으로 변동성(위험)이 가장 낮았던 지점입니다.
-
-🟢최적비율: 위험 대비 보상이 가장 커서 자산 배분 시 가장 권장되는 지점입니다.
-기준금리 3%로 반영함.
-                """
-            )
-
-            # 2. 개별 자산의 Sharpe Ratio 직접 계산
-            def calc_sharpe(ret, vol):
-                rf=0.03
-                return (ret - rf) / vol if vol != 0 else 0
-
-            asset1_sharpe = calc_sharpe(asset_metrics[ticker1_mpt]['Return'], asset_metrics[ticker1_mpt]['Volatility'])
-            asset2_sharpe = calc_sharpe(asset_metrics[ticker2_mpt]['Return'], asset_metrics[ticker2_mpt]['Volatility'])
-
-            mvp_sharpe_3pct = calc_sharpe(mvp['Return'], mvp['Volatility'])
-            max_sharpe_3pct = calc_sharpe(max_sharpe['Return'], max_sharpe['Volatility'])
-
-
-            # 3. 데이터 프레임 구축 및 출력
-            comparison_df = pd.DataFrame({
-                "항목": ["연간 수익률", "연간 변동성(위험)", "Sharpe Ratio"],
-                f"{ticker1_mpt}": [
-                    f"{asset_metrics[ticker1_mpt]['Return'] * 100:.2f}%",
-                    f"{asset_metrics[ticker1_mpt]['Volatility'] * 100:.2f}%",
-                    f"{asset1_sharpe:.2f}"
-                ],
-                f"{ticker2_mpt}": [
-                    f"{asset_metrics[ticker2_mpt]['Return'] * 100:.2f}%",
-                    f"{asset_metrics[ticker2_mpt]['Volatility'] * 100:.2f}%",
-                    f"{asset2_sharpe:.2f}"
-                ],
-                "🔵 최고안전": [
-                    f"{mvp['Return'] * 100:.2f}%",
-                    f"{mvp['Volatility'] * 100:.2f}%",
-                    f"{mvp_sharpe_3pct:.2f}"
-                ],
-                "🟢 최적비율": [
-                    f"{max_sharpe['Return'] * 100:.2f}%",
-                    f"{max_sharpe['Volatility'] * 100:.2f}%",
-                    f"{max_sharpe_3pct:.2f}"
-                ]
-            })
-            comparison_df.set_index("항목", inplace=True)
-            st.table(comparison_df)
-
-
+            st.markdown(f"💡 **분석 결과:** 현재 가장 효율적인 지점은 **{df_res.iloc[0]['대상']}**입니다.")
+            st.caption(f"ℹ️ 기간: {start_date_mpt}~{end_date_mpt} | 기준금리 {user_rf}% 반영", 
+                       help=f"Sharpe Ratio = (수익률 - {user_rf}%) / 변동성  \n\n0 이상: 고려 대상  \n1 이상: 우수  \n2 이상: 매우 우수")
 
 # --------------------------------------------------------------------------
-# 섹션 6: 다중 티커 단순 비교 (기준금리 3% 반영 버전)
+# 섹션 6: 다중 티커 단순 비교
 # --------------------------------------------------------------------------
 elif st.session_state.active_tab == "다중 티커 비교":
-
-    col_multi_input, col_multi_period = st.columns([2, 1])
-
+    col_multi_input, col_multi_period, col_multi_rf = st.columns([2, 1, 1])
     with col_multi_input:
-        multi_ticker_input = st.text_input("비교할 티커 입력 (쉼표나 공백으로 구분)", value="TQQQ QQQ SPY", key="multi_ticker_mpt_sec6")
-        
+        multi_ticker_input = st.text_input("비교할 티커 입력", value="TQQQ QQQ SPY", key="multi_ticker_mpt_sec6")
     with col_multi_period:
         period_options_multi = {"1년": 365, "3년": 3 * 365, "5년": 5 * 365}
         selected_period_multi_name = st.selectbox("분석 기간:", list(period_options_multi.keys()), index=0, key="period_mpt_sec6")
-
+    with col_multi_rf:
+        user_rf = st.number_input("기준금리(%)", value=3.0, step=0.1, key="rf_sec6")
+        rf_multi = user_rf / 100
+    
     ticker_list_multi = [t.strip().upper() for t in multi_ticker_input.replace(',', ' ').split() if t.strip()]
-
     days_multi = period_options_multi[selected_period_multi_name]
-    start_date_multi = (TODAY - timedelta(days=days_multi)).strftime('%Y-%m-%d')
-    end_date_multi = TODAY.strftime('%Y-%m-%d')
+    start_date_multi, end_date_multi = (TODAY - timedelta(days=days_multi)).strftime('%Y-%m-%d'), TODAY.strftime('%Y-%m-%d')
 
     if ticker_list_multi:
-        with st.spinner(f"다중 티커 ({', '.join(ticker_list_multi)}) 분석 중..."):
-            df_multi_metrics, multi_error = calculate_multi_ticker_metrics(ticker_list_multi, start_date_multi, end_date_multi)
-            
-        if multi_error:
-            st.error(f"다중 티커 분석 오류: {multi_error}")
-        elif df_multi_metrics is not None and not df_multi_metrics.empty:
-            
-            # --- [수정 포인트 1] 기준금리 3% 반영하여 샤프 비율 재계산 ---
-            rf_multi = 0.03
-            df_multi_metrics['Sharpe_Ratio'] = (df_multi_metrics['Return'] - rf_multi) / df_multi_metrics['Volatility']
+        with st.spinner("다중 분석 중..."):
+            df_m, err = calculate_multi_ticker_metrics(ticker_list_multi, start_date_multi, end_date_multi)
+        if err: st.error(err)
+        elif df_m is not None and not df_m.empty:
+            df_m['Sharpe_Ratio'] = (df_m['Return'] - rf_multi) / df_m['Volatility']
 
-            # ==========================================================
-            # 2. Plotly 그래프 (수익률 vs 위험률 Scatter)
-            # ==========================================================
-            st.markdown("#### 📈 자산별 위험 대비 수익 현황", 
-                        help="우상단에 있을수록 고수익/고위험, 좌상단에 있을수록 고효율(가성비) 자산입니다.")
-            
-            fig_multi = go.Figure()
-
-            fig_multi.add_trace(go.Scatter(
-                x=df_multi_metrics['Volatility'] * 100,
-                y=df_multi_metrics['Return'] * 100,
-                mode='markers+text',
-                text=df_multi_metrics['Ticker'],
-                textposition="bottom center",
-                marker=dict(
-                    size=15, 
-                    opacity=0.8, 
-                    color=df_multi_metrics['Sharpe_Ratio'], 
-                    colorscale='Viridis', 
-                    showscale=True, 
-                    colorbar=dict(
-                        title="Sharpe Ratio",
-                        orientation="h",
-                        yanchor="top",
-                        y=-0.2,
-                        thickness=15,
-                        len=0.7
-                    )
-                ),
-                hovertemplate=(
-                    '<b>%{text}</b><br>' +
-                    '수익률: %{y:.2f}%<br>' +
-                    '위험률: %{x:.2f}%<br>' +
-                    '샤프 비율(3% 기준): %{marker.color:.2f}<extra></extra>'
-                )
-            ))
-
-            fig_multi.update_layout(
-                xaxis_title="연간 위험률 (%)", 
-                yaxis_title="연간 수익률 (%)",
-                template="plotly_white", 
-                height=500, 
-                hovermode="closest",
-                xaxis=dict(autorange=True, rangemode='tozero'),
-                yaxis=dict(autorange=True, rangemode='tozero')
-            )
+            st.markdown("#### 📈 자산별 위험 대비 수익 현황", help="우상단: 고위험고수익, 좌상단: 가성비(고효율)")
+            fig_multi = go.Figure(go.Scatter(x=df_m['Volatility']*100, y=df_m['Return']*100, mode='markers+text', text=df_m['Ticker'], textposition="bottom center",
+                                            marker=dict(size=15, color=df_m['Sharpe_Ratio'], colorscale='Viridis', showscale=True, 
+                                                        colorbar=dict(title="Sharpe", orientation="h", y=-0.25, thickness=15, outlinewidth=0))))
+            fig_multi.update_layout(xaxis_title="위험률 (%)", yaxis_title="수익률 (%)", template="plotly_white", height=700, margin=dict(b=100), xaxis=dict(rangemode='tozero'), yaxis=dict(rangemode='tozero'))
             st.plotly_chart(fig_multi, use_container_width=True)
-            
-            # ==========================================================
-            # 3. 결과표 출력
-            # ==========================================================
-            df_display = df_multi_metrics.copy()
-            df_display = df_display.sort_values(by='Sharpe_Ratio', ascending=False)
-            df_display.index = range(1, len(df_display) + 1)
-            df_display.index.name = "순위"
-            
-            # 표시 형식 지정
-            df_display['Return'] = df_display['Return'].apply(lambda x: f"{x * 100:.2f}%")
-            df_display['Volatility'] = df_display['Volatility'].apply(lambda x: f"{x * 100:.2f}%")
-            df_display['Sharpe_Ratio'] = df_display['Sharpe_Ratio'].apply(lambda x: f"{x:.2f}")
 
-            st.dataframe(
-                df_display.rename(columns={'Return': '연간 수익률', 'Volatility': '연간 위험률', 'Sharpe_Ratio': '샤프 비율(3% 기준)'}),
-                use_container_width=True,
-            )
+            df_d = df_m.sort_values(by='Sharpe_Ratio', ascending=False).reset_index(drop=True)
+            df_d.index += 1
+            df_d_f = df_d.copy()
+            df_d_f['Return'] = df_d_f['Return'].apply(lambda x: f"{x * 100:.2f}%")
+            df_d_f['Volatility'] = df_d_f['Volatility'].apply(lambda x: f"{x * 100:.2f}%")
+            df_d_f['Sharpe_Ratio'] = df_d_f['Sharpe_Ratio'].apply(lambda x: f"{x:.2f}")
+            st.dataframe(df_d_f.rename(columns={'Ticker':'티커','Return':'수익률','Volatility':'위험률','Sharpe_Ratio':'Sharpe Ratio'}), use_container_width=True)
 
-            # --- [수정 포인트 2] 안내 문구 변경 ---
-            st.caption(f"ℹ️ 분석 기간: {start_date_multi} ~ {end_date_multi} | **기준금리(무위험 이자율) 3.0% 반영**", 
-                       help="Sharpe Ratio = (연 수익률 - 3.0%) / 연 변동성")
-            
-        else:
-            st.info("유효한 데이터를 가진 티커가 없습니다. 티커를 확인해 주세요.")
-    else:
-        st.info("비교할 티커들을 입력해 주세요.")
+            st.markdown(f"💡 **분석 결과:** 가장 효율적인 자산은 **{df_d.iloc[0]['Ticker']}**입니다.")
+            st.caption(f"ℹ️ 기간: {start_date_multi}~{end_date_multi} | 기준금리 {user_rf}% 반영", 
+                       help=f"Sharpe Ratio = (수익률 - {user_rf}%) / 변동성  \n\n0 이상: 고려 대상  \n1 이상: 우수")
+    else: st.info("티커를 입력해 주세요.")
