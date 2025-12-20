@@ -1423,9 +1423,8 @@ elif st.session_state.active_tab == "2 티커 최적":
 
 
 
-
 # --------------------------------------------------------------------------
-# 섹션 6: 다중 티커 단순 비교 (그래프 상단 배치 및 Zoom Out 기능 재확인)
+# 섹션 6: 다중 티커 단순 비교 (기준금리 3% 반영 버전)
 # --------------------------------------------------------------------------
 elif st.session_state.active_tab == "다중 티커 비교":
 
@@ -1452,12 +1451,15 @@ elif st.session_state.active_tab == "다중 티커 비교":
             st.error(f"다중 티커 분석 오류: {multi_error}")
         elif df_multi_metrics is not None and not df_multi_metrics.empty:
             
+            # --- [수정 포인트 1] 기준금리 3% 반영하여 샤프 비율 재계산 ---
+            rf_multi = 0.03
+            df_multi_metrics['Sharpe_Ratio'] = (df_multi_metrics['Return'] - rf_multi) / df_multi_metrics['Volatility']
 
-            
             # ==========================================================
-            # 2. Plotly 그래프 (수익률 vs 위험률 Scatter) - 맨 위로 이동
+            # 2. Plotly 그래프 (수익률 vs 위험률 Scatter)
             # ==========================================================
-
+            st.markdown("#### 📈 자산별 위험 대비 수익 현황", 
+                        help="우상단에 있을수록 고수익/고위험, 좌상단에 있을수록 고효율(가성비) 자산입니다.")
             
             fig_multi = go.Figure()
 
@@ -1473,43 +1475,37 @@ elif st.session_state.active_tab == "다중 티커 비교":
                     color=df_multi_metrics['Sharpe_Ratio'], 
                     colorscale='Viridis', 
                     showscale=True, 
-                    # ⭐ 컬러바를 하단으로 이동시키는 핵심 설정 ⭐
                     colorbar=dict(
                         title="Sharpe Ratio",
-                        orientation="h",      # 가로 방향(Horizontal)
-                        yanchor="top",        # 기준점을 위쪽으로
-                        y=-0.2,               # 그래프 x축 아래로 배치
-                        thickness=15,         # 막대 두께 조절
-                        len=0.7               # 막대 길이 (70%)
+                        orientation="h",
+                        yanchor="top",
+                        y=-0.2,
+                        thickness=15,
+                        len=0.7
                     )
                 ),
                 hovertemplate=(
                     '<b>%{text}</b><br>' +
                     '수익률: %{y:.2f}%<br>' +
                     '위험률: %{x:.2f}%<br>' +
-                    '샤프 비율: %{marker.color:.2f}<extra></extra>'
+                    '샤프 비율(3% 기준): %{marker.color:.2f}<extra></extra>'
                 )
             ))
 
             fig_multi.update_layout(
-
                 xaxis_title="연간 위험률 (%)", 
                 yaxis_title="연간 수익률 (%)",
                 template="plotly_white", 
                 height=500, 
                 hovermode="closest",
-                # ⭐ Zoom Out/기본 뷰 강화를 위한 설정 ⭐
-                xaxis=dict(autorange=True, rangemode='tozero'), # 0부터 시작하도록 설정
-                yaxis=dict(autorange=True, rangemode='tozero') # 0부터 시작하도록 설정
+                xaxis=dict(autorange=True, rangemode='tozero'),
+                yaxis=dict(autorange=True, rangemode='tozero')
             )
             st.plotly_chart(fig_multi, use_container_width=True)
             
-            
             # ==========================================================
-            # 3. 결과표 출력 - 그래프 아래에 배치
+            # 3. 결과표 출력
             # ==========================================================
-
-            # DataFrame 포매팅 및 순위 지정
             df_display = df_multi_metrics.copy()
             df_display = df_display.sort_values(by='Sharpe_Ratio', ascending=False)
             df_display.index = range(1, len(df_display) + 1)
@@ -1521,19 +1517,15 @@ elif st.session_state.active_tab == "다중 티커 비교":
             df_display['Sharpe_Ratio'] = df_display['Sharpe_Ratio'].apply(lambda x: f"{x:.2f}")
 
             st.dataframe(
-                df_display.rename(columns={'Return': '연간 수익률', 'Volatility': '연간 위험률', 'Sharpe_Ratio': '샤프 비율'}),
+                df_display.rename(columns={'Return': '연간 수익률', 'Volatility': '연간 위험률', 'Sharpe_Ratio': '샤프 비율(3% 기준)'}),
                 use_container_width=True,
             )
 
-            st.info(f"⚠️ **참고:** 분석 기간: {start_date_multi} ~ {end_date_multi}. 샤프 비율 계산 시 무위험 이자율은 편의상 0으로 가정했습니다.")
+            # --- [수정 포인트 2] 안내 문구 변경 ---
+            st.caption(f"ℹ️ 분석 기간: {start_date_multi} ~ {end_date_multi} | **기준금리(무위험 이자율) 3.0% 반영**", 
+                       help="Sharpe Ratio = (연 수익률 - 3.0%) / 연 변동성")
             
         else:
             st.info("유효한 데이터를 가진 티커가 없습니다. 티커를 확인해 주세요.")
     else:
         st.info("비교할 티커들을 입력해 주세요.")
-
-
-
-
-
-
