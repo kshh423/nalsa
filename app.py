@@ -693,7 +693,11 @@ if data_error:
 # --- C. 핵심 계산 실행 (Tab 2, 3, 4에서 사용) ---
 df_calc = calculate_per_and_indicators(hist_data, info['EPS'])
 
-# --- D. 메뉴 설정 (모바일 강제 2열 고정) ---
+
+
+
+
+# --- D. 메뉴 설정 (PC/모바일 반응형 통합) ---
 if 'active_tab' not in st.session_state:
     st.session_state.active_tab = "재무 분석" 
 
@@ -703,57 +707,55 @@ menu_options = [
     "2 티커 최적", "다중 티커 비교"
 ]
 
-# CSS: st.columns 레이아웃 시스템을 무시하고 강제 2열 그리드 생성
+# CSS: PC에서는 한 줄(6열), 모바일에서는 2열로 강제 고정
 st.markdown("""
     <style>
-    /* 상위 컨테이너를 그리드로 설정 */
+    /* 1. 기본 설정 (PC 등 넓은 화면): 한 줄에 6개 배치 */
     div[data-testid="stHorizontalBlock"] {
-        display: grid !important;
-        grid-template-columns: 1fr 1fr !important; /* 무조건 1:1 비율로 2열 */
-        gap: 6px !important; /* 버튼 사이 간격 */
-    }
-    
-    /* Streamlit이 너비가 좁아질 때 100%로 늘리는 것을 방지 */
-    div[data-testid="column"] {
-        width: 100% !important;
-        min-width: 0px !important;
-        flex: none !important;
+        display: flex !important;
+        flex-direction: row !important;
+        gap: 8px !important;
     }
 
-    /* 버튼 스타일 초소형화 */
-    .stButton button {
-        width: 100% !important;
-        height: 2.8rem !important;
-        padding: 0px !important;
-        border-radius: 5px !important;
+    /* 2. 모바일 설정 (화면 너비 768px 이하): 강제 2열 그리드 */
+    @media (max-width: 768px) {
+        div[data-testid="stHorizontalBlock"] {
+            display: grid !important;
+            grid-template-columns: 1fr 1fr !important; /* 무조건 2열 */
+            gap: 6px !important;
+        }
+        
+        div[data-testid="column"] {
+            width: 100% !important;
+            min-width: 0px !important;
+            flex: none !important;
+        }
+        
+        .stButton button p {
+            font-size: 0.72rem !important;
+        }
     }
-    
-    .stButton button p {
-        font-size: 0.72rem !important;
-        word-break: keep-all !important;
-        white-space: normal !important;
-        line-height: 1.1 !important;
+
+    /* 공통 버튼 스타일 */
+    .stButton button {
+        height: 2.8rem !important;
+        border-radius: 8px !important;
     }
     </style>
     """, unsafe_allow_html=True)
 
-# 버튼 배치 (각 행마다 2개씩 배치하도록 루프 구성)
-for i in range(0, len(menu_options), 2):
-    row_options = menu_options[i:i+2]
-    # 여기서 st.columns(2)를 쓰지만, 위 CSS가 이를 무조건 2열 그리드로 강제함
-    cols = st.columns(2)
-    for j, option in enumerate(row_options):
-        with cols[j]:
-            is_active = (st.session_state.active_tab == option)
-            btn_type = "primary" if is_active else "secondary"
-            if st.button(option, key=f"fixed_btn_{i}_{j}", use_container_width=True, type=btn_type):
-                st.session_state.active_tab = option
-                st.rerun()
+# 버튼 출력 (컴퓨터에서는 한 줄에 6개를 다 넣기 위해 단일 columns 생성)
+# 모바일에서는 위 미디어 쿼리에 의해 알아서 그리드로 변합니다.
+cols = st.columns(len(menu_options))
+for i, option in enumerate(menu_options):
+    with cols[i]:
+        is_active = (st.session_state.active_tab == option)
+        btn_type = "primary" if is_active else "secondary"
+        if st.button(option, key=f"resp_btn_{i}", use_container_width=True, type=btn_type):
+            st.session_state.active_tab = option
+            st.rerun()
 
 st.markdown("---")
-
-
-
 
 
 
