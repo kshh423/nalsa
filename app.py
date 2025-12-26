@@ -708,7 +708,7 @@ if 'active_tab' not in st.session_state:
 menu_options = [
     "재무 분석", "적립 모드 (DCA)", 
     "PER 그래프 분석", "주가 및 이동평균선", 
-    "2 티커 최적", "다중 티커 비교"
+    "2 티커 최적", "다중 티커 비교", "DCA 시뮬레이션"
 ]
 
 # CSS: PC에서는 한 줄(6열), 모바일에서는 2열로 강제 고정
@@ -1378,3 +1378,190 @@ elif st.session_state.active_tab == "다중 티커 비교":
             st.caption(f"ℹ️ 기간: {start_date_multi}~{end_date_multi} | 기준금리 {user_rf}% 반영", 
                        help=f"Sharpe Ratio = (수익률 - {user_rf}%) / 변동성  \n\n0 이상: 고려 대상  \n1 이상: 우수")
     else: st.info("티커를 입력해 주세요.")
+    
+    
+    
+# --------------------------------------------------------------------------
+# 섹션 7: DCA 시뮬레이션 비교 (비교 2 + 배경 1)
+# --------------------------------------------------------------------------
+elif st.session_state.active_tab == "DCA 시뮬레이션 비교":
+    
+    st.title("💸 DCA 시뮬레이션 비교 (2종목 + 배경)")
+    st.markdown("선택한 두 종목과 시장 전체를 나타내는 배경 종목의 **월별 적립식 투자(DCA)** 성과를 비교합니다.")
+
+    # 1. 설정 입력 (티커 및 기간)
+    col_t1, col_t2, col_t_bg, col_dca_amount_input, col_period = st.columns([2, 2, 2, 2, 2])
+
+    with col_t1:
+        ticker1_dca = st.text_input("비교 종목 1", value="QQQ", key="dca_t1").upper()
+    with col_t2:
+        ticker2_dca = st.text_input("비교 종목 2", value="NVDA", key="dca_t2").upper()
+    with col_t_bg:
+        ticker_bg = st.text_input("배경 종목 (시장)", value="SPY", key="dca_t_bg").upper()
+
+    # 금액 및 기간 설정
+    with col_dca_amount_input:
+        monthly_invest = st.number_input("월별 적립 금액 (USD)", min_value=10.0, value=1000.0, step=100.0, format="%.0f", key="dca_invest_amount")
+    with col_period:
+        years = st.number_input("기간 (년)", min_value=1, max_value=30, value=15, step=1, key="dca_years")
+    
+    comparison_tickers = [ticker1_dca, ticker2_dca]
+    all_tickers = comparison_tickers + [ticker_bg]
+    
+    if len(set(all_tickers)) != 3:
+        st.error("비교 종목과 배경 종목은 서로 다른 티커여야 합니다.")
+    elif ticker1_dca and ticker2_dca and ticker_bg:
+        
+        # 2. 데이터 준비 및 계산 (월별 DCA 시뮬레이션 로직)
+        end_date = TODAY
+        start_date = TODAY - timedelta(days=years * 365)
+        
+        data_store = {}
+        common_index = None
+        
+        @st.cache_data(ttl=60*60*4) # 4시간 캐시
+        def run_dca_simulation(tickers, start_d, end_d, invest_amount):
+            store = {}
+            index_union = None
+            
+            for ticker in tickers:
+                try:
+                    df = yf.download(ticker, start=start_d, end=end_d, progress=False)
+                    if df.empty or 'Adj Close' not in df.columns: continue
+
+                    # 월별 첫 거래일 종가만 사용
+                    monthly_df = df['Adj Close'].resample('MS').first()
+                    
+                    # DCA 계산
+                    shares_bought = invest_amount / monthly_df
+                    total_shares = shares_bought.cumsum()
+                    portfolio_value = total_shares * monthly_df
+                    
+                    store[ticker] = portfolio_value.fillna(method='ffill') # 결측치 처리
+                    
+                    if index_union is None:
+                        index_union = portfolio_value.index
+                    else:
+                        index_union = index_union.union(portfolio_value.index)
+                        
+                except Exception as e:
+                    # st.warning(f"[{ticker}] 데이터 처리 중 오류 발생: {e}")
+                    continue
+            
+            # 모든 티커를 공통 인덱스에 맞추고, 투자 금액 계산
+            final_index = index_union
+            if final_index is None or final_index.empty:
+                return {}, None, 0
+
+            max_len = max(len(store[t]) for t in store)
+            
+            invested_cash = [invest_amount * (i + 1) for i in range(max_len)]
+            
+            # 최종 정렬 및 데이터 반환
+            aligned_store = {}
+            for t in store:
+                aligned_store[t] = store[t].reindex(final_index, method='ffill')
+            
+            return aligned_store, final_index, invested_cash
+            
+        with st.spinner(f"시뮬레이션 기간 ({start_date.strftime('%Y-%m-%d')} ~ {end_date.strftime('%Y-%m-%d')}) 데이터 로드 중..."):
+            data_store, common_index, invested_cash_list = run_dca_simulation(all_tickers, start_date, end_date, monthly_invest)
+            
+        if not data_store or not common_index:
+            st.error("데이터를 가져오는 데 실패했거나 유효한 거래일이 부족합니다. 티커 및 기간 설정을 확인해 주세요.")
+        else:
+            
+            # 3. 결과 요약 및 메트릭 출력
+            st.markdown("---")
+            st.markdown("### 📊 최종 시뮬레이션 결과")
+
+            final_data = {}
+            for t in data_store:
+                if t in data_store and not data_store[t].empty:
+                    final_data[t] = data_store[t].iloc[-1]
+            
+            final_invested = invested_cash_list[len(data_store[comparison_tickers[0]]) - 1] # 실제 투자된 횟수만큼의 금액
+            
+            col_final = st.columns(len(final_data) + 1)
+            
+            col_final[0].metric("총 투자 원금", f"${final_invested:,.0f}")
+            
+            sorted_final = sorted(final_data.items(), key=lambda item: item[1], reverse=True)
+            
+            for i, (ticker, value) in enumerate(sorted_final):
+                roi = (value - final_invested) / final_invested * 100
+                delta_str = f"ROI: {roi:.1f}%"
+                
+                # 배경 티커는 배경색, 비교 티커는 대비되는 색 사용
+                if ticker == ticker_bg:
+                    color_style = 'off' 
+                    label_suffix = " (배경)"
+                else:
+                    color_style = 'inverse' if roi < 0 else 'normal'
+                    label_suffix = ""
+
+                col_final[i+1].metric(
+                    label=f"{ticker}{label_suffix}", 
+                    value=f"${value:,.0f}", 
+                    delta=delta_str, 
+                    delta_color=color_style
+                )
+
+            # 4. Plotly 그래프 생성
+            st.markdown("---")
+            st.markdown("### 📈 포트폴리오 가치 추이")
+            
+            fig_dca_comp = go.Figure()
+            
+            # Plotly 색상 지정
+            comp_colors = {'QQQ': '#1f77b4', 'NVDA': '#ff7f0e', 'SPY': 'lightgrey', 'VTI': 'lightgrey'}
+            
+            # 배경 티커 (SPY) 라인을 먼저, 굵게, 흐리게 그립니다.
+            if ticker_bg in data_store:
+                fig_dca_comp.add_trace(go.Scatter(
+                    x=data_store[ticker_bg].index, 
+                    y=data_store[ticker_bg].values, 
+                    mode='lines', name=f'{ticker_bg} (배경)',
+                    line=dict(color=comp_colors.get(ticker_bg, 'lightgrey'), width=4), 
+                    opacity=0.5,
+                    yaxis='y1'
+                ))
+
+            # 비교 티커 1, 2 라인을 그립니다.
+            for ticker in comparison_tickers:
+                if ticker in data_store:
+                    fig_dca_comp.add_trace(go.Scatter(
+                        x=data_store[ticker].index, 
+                        y=data_store[ticker].values, 
+                        mode='lines', name=ticker,
+                        line=dict(color=comp_colors.get(ticker, 'black'), width=2), 
+                        yaxis='y1'
+                    ))
+
+            # 총 투자 원금 라인
+            invested_series = pd.Series(invested_cash_list[:len(data_store[comparison_tickers[0]])], index=data_store[comparison_tickers[0]].index)
+            fig_dca_comp.add_trace(go.Scatter(
+                x=invested_series.index, 
+                y=invested_series.values, 
+                mode='lines', name='총 투자 원금',
+                line=dict(color='black', width=1, dash='dash'), 
+                yaxis='y1'
+            ))
+
+            fig_dca_comp.update_layout(
+                title=f"월별 ${monthly_invest:,.0f} DCA 시뮬레이션 ({years}년)", 
+                height=600, 
+                xaxis_title="날짜", 
+                yaxis_title="포트폴리오 가치 (USD)",
+                hovermode="x unified", 
+                template="plotly_white",
+                legend=dict(x=0.01, y=0.99, yanchor="top", xanchor="left")
+            )
+            st.plotly_chart(fig_dca_comp, use_container_width=True)
+
+    else:
+        st.info("비교할 티커 2개와 배경 티커 1개를 입력해 주세요.")
+
+# --------------------------------------------------------------------------
+# (새로운 탭 로직 추가 끝)
+# --------------------------------------------------------------------------
